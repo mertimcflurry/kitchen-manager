@@ -4,7 +4,10 @@ node_modules/
 # Build-Artefakte
 .svelte-kit/
 build/
+.output/
 .vite/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
 # Secrets
 .env

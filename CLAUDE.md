@@ -22,13 +22,13 @@ wirkt: ansprechen, nicht kommentarlos umsetzen.
 
 ## Hardware & Betrieb
 
-| | |
-|---|---|
-| Host | Raspberry Pi 5, 8 GB RAM, aarch64, Debian 13 (trixie) |
-| Pfad | `~/projects/kitchen-manager` |
-| Dev-Server | Vite auf Port **5173** (Host-Node) |
-| Betrieb | Docker-Container auf Port **3001** |
-| Tailscale | Pi = `raspbert-1` / 100.117.150.4 |
+|               |                                                                |
+| ------------- | -------------------------------------------------------------- |
+| Host          | Raspberry Pi 5, 8 GB RAM, aarch64, Debian 13 (trixie)          |
+| Pfad          | `~/projects/kitchen-manager`                                   |
+| Dev-Server    | Vite auf Port **5173** (Host-Node)                             |
+| Betrieb       | Docker-Container auf Port **3001**                             |
+| Tailscale     | Pi = `raspbert-1` / 100.117.150.4                              |
 | Belegte Ports | 22 ssh · 3001 diese App · 8010 Paperless · 9000/9443 Portainer |
 
 Port 3001 ist in `~/projects/README.md` für dieses Projekt reserviert. Nicht
@@ -39,12 +39,21 @@ Port 3001 ist in `~/projects/README.md` für dieses Projekt reserviert. Nicht
 - **SvelteKit 2** mit **Svelte 5 (Runes)**, TypeScript
 - **SQLite** über **Drizzle ORM**, DB unter `data/kitchen.db` (Bind-Mount, nicht in Git)
 - **Tailwind** fürs Styling
-- **Node 22 LTS** über NodeSource — Debians `apt`-Node 20 ist zu alt
+- **Node 22 LTS**, entpackt unter `~/.local/lib/nodejs/`, Symlinks in
+  `~/.local/bin` (schon im PATH). Kein systemweites Node: auf diesem Pi gibt es
+  kein passwortloses `sudo`, und Debians `apt`-Node 20 wäre ohnehin zu alt.
+  Update per Tarball von nodejs.org ins selbe Verzeichnis.
 - **Anthropic SDK** (`@anthropic-ai/sdk`), ausschließlich serverseitig
 - Später als PWA installierbar (braucht HTTPS über `tailscale serve`)
 
-Exakte Versionen stehen nach dem Setup in `package.json` — dort nachsehen, hier
-nicht duplizieren.
+Exakte Versionen stehen in `package.json` — dort nachsehen, hier nicht
+duplizieren.
+
+**Dev-Zugriff vom Handy:** `http://raspbert-1.tailfa6004.ts.net:5173` oder
+`http://100.117.150.4:5173`. Der Vite-Server bindet an alle Interfaces und
+erlaubt in `vite.config.ts` gezielt den MagicDNS-Namen — fremde Host-Header
+laufen absichtlich in ein 403. Neuer Gerätename im Tailnet heißt: `allowedHosts`
+mitpflegen, sonst kommt vom Handy nur „Blocked request".
 
 ## Verzeichnisstruktur
 
@@ -55,13 +64,18 @@ src/
 │   │   ├── db/         # Drizzle-Schema, Migrationen, Queries
 │   │   └── ai/         # Anthropic-Aufrufe, Prompts, Schemas
 │   ├── components/     # wiederverwendbare Svelte-Komponenten
-│   └── types.ts        # geteilte Typen
-├── routes/             # SvelteKit-Routing, +page.svelte / +page.server.ts
-└── app.css             # Tailwind-Einstieg
+│   └── date.ts         # MHD-Rechnerei, reine Funktionen mit Tests daneben
+├── routes/
+│   ├── +layout.svelte  # App-Shell: Rahmen, Bottom-Nav
+│   ├── layout.css      # Tailwind-Einstieg und Safe-Area-Helfer
+│   └── <route>/        # +page.svelte / +page.server.ts je Screen
 data/                   # SQLite-DB, Bon-Bilder — nicht in Git
 drizzle/                # generierte Migrationen — in Git
 static/                 # PWA-Manifest, Icons
 ```
+
+Es gibt keine `svelte.config.js`: die Kit-Konfiguration steckt im
+`sveltekit()`-Plugin in `vite.config.ts`. Runes-Modus ist dort erzwungen.
 
 Alles unter `src/lib/server/` wird von SvelteKit garantiert nie ins Frontend
 gebündelt. API-Key und DB-Zugriff gehören ausnahmslos dorthin.
@@ -89,15 +103,18 @@ laufenden System ändern.
 
 ```bash
 npm run dev            # Dev-Server auf 5173, HMR
-npm run build          # Produktions-Build
+npm run build          # Produktions-Build (adapter-node)
 npm run preview        # Build lokal testen
 npm run check          # svelte-check + TypeScript
-npm run lint           # ESLint + Prettier
-npm test               # Vitest
+npm run lint           # Prettier --check und ESLint
+npm run format         # Prettier schreibend
+npm test               # Vitest einmalig
+npm run test:unit      # Vitest im Watch-Modus
 
 npm run db:generate    # Migration aus Schema-Änderung erzeugen
 npm run db:migrate     # Migrationen anwenden
 npm run db:studio      # Drizzle Studio, DB im Browser ansehen
+npm run db:push        # Schema direkt pushen — nur zum Wegwerf-Experimentieren
 
 docker compose up -d --build   # Betrieb auf 3001
 docker compose logs -f

@@ -13,76 +13,82 @@ vom selben Produkt haben so eigene MHDs, und „was kaufe ich häufig" bleibt
 trotzdem sauber auswertbar.
 
 ### `category`
-| Feld | Typ | Zweck |
-|---|---|---|
-| `id` | int PK | |
-| `name` | text | „Obst", „Milchprodukte", „Konserven" |
-| `default_shelf_life_days` | int | MHD-Schätzung: Obst 7, Tofu 90, Konserven 365 |
-| `emoji` | text | visueller Anker in der Liste, spart Lesezeit |
-| `sort_order` | int | |
+
+| Feld                      | Typ    | Zweck                                         |
+| ------------------------- | ------ | --------------------------------------------- |
+| `id`                      | int PK |                                               |
+| `name`                    | text   | „Obst", „Milchprodukte", „Konserven"          |
+| `default_shelf_life_days` | int    | MHD-Schätzung: Obst 7, Tofu 90, Konserven 365 |
+| `emoji`                   | text   | visueller Anker in der Liste, spart Lesezeit  |
+| `sort_order`              | int    |                                               |
 
 ### `product` — Stammdaten
-| Feld | Typ | Zweck |
-|---|---|---|
-| `id` | int PK | |
-| `name` | text | „Tofu natur" |
-| `category_id` | int FK | |
-| `default_unit` | text | `piece` \| `g` \| `ml` \| `pack` |
-| `shelf_life_days` | int? | überschreibt die Kategorie, wenn gesetzt |
-| `created_at` | int | |
+
+| Feld              | Typ    | Zweck                                    |
+| ----------------- | ------ | ---------------------------------------- |
+| `id`              | int PK |                                          |
+| `name`            | text   | „Tofu natur"                             |
+| `category_id`     | int FK |                                          |
+| `default_unit`    | text   | `piece` \| `g` \| `ml` \| `pack`         |
+| `shelf_life_days` | int?   | überschreibt die Kategorie, wenn gesetzt |
+| `created_at`      | int    |                                          |
 
 ### `stock_item` — was gerade da ist
-| Feld | Typ | Zweck |
-|---|---|---|
-| `id` | int PK | |
-| `product_id` | int FK | |
-| `quantity` | real | Zahl, geändert über +/- — nie Tastatur |
-| `unit` | text | vom Produkt vorbelegt |
-| `location` | text | `fridge` \| `freezer` \| `pantry` (feste Liste) |
-| `best_before` | int? | geschätzt oder überschrieben |
-| `best_before_is_estimated` | bool | Schätzung wird in der UI anders dargestellt |
-| `is_opened` | bool | „angebrochen" statt Restmengen-Rechnerei |
-| `purchased_at` | int | |
-| `consumed_at` | int? | gesetzt = aufgebraucht; Basis für die Auswertung |
-| `receipt_id` | int? FK | Herkunft, falls über Bon eingetragen |
+
+| Feld                       | Typ     | Zweck                                            |
+| -------------------------- | ------- | ------------------------------------------------ |
+| `id`                       | int PK  |                                                  |
+| `product_id`               | int FK  |                                                  |
+| `quantity`                 | real    | Zahl, geändert über +/- — nie Tastatur           |
+| `unit`                     | text    | vom Produkt vorbelegt                            |
+| `location`                 | text    | `fridge` \| `freezer` \| `pantry` (feste Liste)  |
+| `best_before`              | int?    | geschätzt oder überschrieben                     |
+| `best_before_is_estimated` | bool    | Schätzung wird in der UI anders dargestellt      |
+| `is_opened`                | bool    | „angebrochen" statt Restmengen-Rechnerei         |
+| `purchased_at`             | int     |                                                  |
+| `consumed_at`              | int?    | gesetzt = aufgebraucht; Basis für die Auswertung |
+| `receipt_id`               | int? FK | Herkunft, falls über Bon eingetragen             |
 
 `consumed_at` statt Löschen: daraus ergibt sich „was ist typischerweise bald
 alle" ohne eine zweite Historientabelle.
 
 ### `receipt` + `receipt_line` — Bon-Import
-| `receipt` | | |
-|---|---|---|
-| `id` | int PK | |
-| `image_path` | text | Datei unter `data/receipts/` |
-| `store` | text? | vom Modell erkannt |
-| `purchased_at` | int? | |
-| `status` | text | `pending` \| `confirmed` \| `discarded` |
-| `raw_response` | text | Modellantwort roh, für Fehlersuche und Prompt-Tuning |
 
-| `receipt_line` | | |
-|---|---|---|
-| `id` | int PK | |
-| `receipt_id` | int FK | |
-| `raw_text` | text | „BIO-TOFU NAT 400G" |
-| `parsed_name` | text | Modellvorschlag |
-| `quantity` / `unit` / `price` | | |
-| `confidence` | text | `high` \| `low` — Unsicheres wird im Prüf-Screen markiert |
-| `product_id` | int? FK | nach Zuordnung |
-| `status` | text | `pending` \| `accepted` \| `rejected` |
+| `receipt`      |        |                                                      |
+| -------------- | ------ | ---------------------------------------------------- |
+| `id`           | int PK |                                                      |
+| `image_path`   | text   | Datei unter `data/receipts/`                         |
+| `store`        | text?  | vom Modell erkannt                                   |
+| `purchased_at` | int?   |                                                      |
+| `status`       | text   | `pending` \| `confirmed` \| `discarded`              |
+| `raw_response` | text   | Modellantwort roh, für Fehlersuche und Prompt-Tuning |
+
+| `receipt_line`                |         |                                                           |
+| ----------------------------- | ------- | --------------------------------------------------------- |
+| `id`                          | int PK  |                                                           |
+| `receipt_id`                  | int FK  |                                                           |
+| `raw_text`                    | text    | „BIO-TOFU NAT 400G"                                       |
+| `parsed_name`                 | text    | Modellvorschlag                                           |
+| `quantity` / `unit` / `price` |         |                                                           |
+| `confidence`                  | text    | `high` \| `low` — Unsicheres wird im Prüf-Screen markiert |
+| `product_id`                  | int? FK | nach Zuordnung                                            |
+| `status`                      | text    | `pending` \| `accepted` \| `rejected`                     |
 
 ### `product_alias` — die Lerntabelle
-| Feld | Typ | Zweck |
-|---|---|---|
-| `id` | int PK | |
+
+| Feld                  | Typ         | Zweck            |
+| --------------------- | ----------- | ---------------- |
+| `id`                  | int PK      |                  |
 | `raw_text_normalized` | text UNIQUE | „biotofunat400g" |
-| `product_id` | int FK | |
-| `store` | text? | |
-| `hit_count` | int | |
+| `product_id`          | int FK      |                  |
+| `store`               | text?       |                  |
+| `hit_count`           | int         |                  |
 
 Wird **vor** dem Modell befragt. Nach ein paar Einkäufen im selben Laden geht
 nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### `shopping_list_item`
+
 `id` · `product_id?` · `free_text` · `quantity` · `unit` · `is_done` ·
 `source` (`manual` \| `suggested`) · `created_at`
 
@@ -120,25 +126,30 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 ## 3. Meilensteine
 
 ### M0 — Kontext und Repo ✅
+
 - [x] Umgebung erfasst, Konflikte geklärt
 - [x] FastAPI-Skeleton entfernt, Container gestoppt, Port 3001 frei
 - [x] `CLAUDE.md`, `PLAN.md`, `.gitignore`
 
 ### M1 — Toolchain und Gerüst
-- [ ] Node 22 LTS über NodeSource installieren
-- [ ] SvelteKit + TypeScript + Tailwind aufsetzen
-- [ ] ESLint, Prettier, Vitest
-- [ ] `.env.example` mit `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
-- [ ] `npm run dev` läuft, vom Handy über Tailscale auf 5173 erreichbar
-- [ ] Mobile-Grundlayout: Bottom-Nav, Safe-Area, Touch-Ziele ≥ 44 px
+
+- [x] Node 22 LTS installiert — ins Home statt systemweit, siehe `CLAUDE.md`
+- [x] SvelteKit + TypeScript + Tailwind aufgesetzt
+- [x] ESLint, Prettier, Vitest — `check`, `lint`, `test`, `build` laufen sauber
+- [x] `.env.example` mit `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
+- [x] `npm run dev` läuft, alle fünf Routen liefern 200 über die Tailscale-IP
+- [x] Mobile-Grundlayout: Bottom-Nav, Safe-Area, Touch-Ziele ≥ 44 px
+- [ ] **Am Handy gegengeprüft** — offen, das kann nur Mert selbst
 
 ### M2 — Datenmodell
+
 - [ ] Drizzle-Schema nach Abschnitt 1
 - [ ] Migrationen erzeugen und anwenden
 - [ ] Kategorien mit MHD-Defaults seeden
 - [ ] Testdaten zum Entwickeln
 
 ### M3 — Inventar (das Herzstück)
+
 - [ ] Bestandsliste nach Ablauf, Ort-Tabs
 - [ ] +/- ohne Tastatur, optimistisch
 - [ ] „Aufgebraucht" per Wischen, mit Undo
@@ -147,11 +158,13 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [ ] **Am Handy vor dem Kühlschrank testen, bevor es weitergeht**
 
 ### M4 — MHD
+
 - [ ] Automatische Schätzung aus Kategorie beim Anlegen
 - [ ] Pro Artikel überschreibbar, Schätzung optisch unterscheidbar
 - [ ] „Bald schlecht"-Ansicht mit Ampel
 
 ### M5 — Bon-Import
+
 - [ ] Upload und Kamera, Bild nach `data/receipts/`
 - [ ] Anthropic Vision mit Structured Outputs, serverseitig
 - [ ] Prüf-Screen mit Korrigieren und Verwerfen
@@ -159,27 +172,32 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [ ] Fehlerfälle: unlesbar, Timeout, kein Guthaben
 
 ### M6 — Alias-Lernen
+
 - [ ] Alias beim Bestätigen einer Zeile schreiben
 - [ ] Alias vor dem Modellaufruf abfragen
 - [ ] Anzeigen, wie viel ohne API erkannt wurde
 
 ### M7 — Auswertung und Einkaufsliste
+
 - [ ] Kaufhäufigkeit je Produkt
 - [ ] Typische Verbrauchsdauer aus `purchased_at` → `consumed_at`
 - [ ] Vorschläge daraus ableiten
 - [ ] Einkaufsliste mit Abhaken
 
 ### M8 — Rezeptvorschlag
+
 - [ ] „Was koche ich?" mit Bestand als Kontext
 - [ ] Ablaufendes bevorzugen
 - [ ] Verbrauchte Zutaten direkt abbuchen können
 
 ### M9 — Betrieb
+
 - [ ] Dockerfile für Node 22, Build auf aarch64
 - [ ] `compose.yml` auf Port 3001, `data/` als Bind-Mount, non-root
 - [ ] Autostart, Backup-Notiz in `~/docker/README.md`-Manier
 
 ### M10 — PWA
+
 - [ ] `tailscale serve` für HTTPS einrichten (Voraussetzung für Service Worker)
 - [ ] Manifest, Icons, „Zum Homescreen"
 - [ ] Offline-Ansicht des Bestands

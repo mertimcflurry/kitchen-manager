@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@theme {
+	--font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+@layer base {
+	html {
+		/* Kein graues Aufblitzen beim Antippen — die App gibt eigenes Feedback. */
+		-webkit-tap-highlight-color: transparent;
+		/* Verhindert, dass iOS Text beim Drehen groesser skaliert. */
+		-webkit-text-size-adjust: 100%;
+	}
+
+	body {
+		/* Kein Overscroll-Bounce, damit sich die Liste nicht wie eine Webseite anfuehlt. */
+		overscroll-behavior-y: none;
+	}
+
+	/* Wer Bewegung reduziert haben will, bekommt sie nicht. */
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
+}
+
+/*
+ * Safe-Area-Helfer fuer die Notch und den Home-Indicator.
+ * Als normale Klassen statt @utility, damit sie unabhaengig von der
+ * Tailwind-Version funktionieren.
+ */
+@layer utilities {
+	.pt-safe {
+		padding-top: env(safe-area-inset-top, 0px);
+	}
+
+	.pb-safe {
+		padding-bottom: env(safe-area-inset-bottom, 0px);
+	}
+
+	/* Abstand fuer Inhalt, der ueber der Bottom-Nav endet. */
+	.pb-nav {
+		padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+	}
+}
