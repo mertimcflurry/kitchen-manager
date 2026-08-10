@@ -268,6 +268,13 @@ Angenommene Defaults, bis widersprochen wird:
 Aufgefallen beim Benutzen, bewusst nicht sofort gelöst. Erst entscheiden, wenn
 klar ist, ob es im Alltag stört.
 
+- [ ] **Undo-Leiste verdeckt den Plus-Knopf.** Beide liegen in derselben Spur:
+      Leiste bei `5.5rem`, Knopf bei `5.25rem` (`Snackbar.svelte` bzw.
+      `+page.svelte`), und die Leiste ist über die volle Breite. Entstanden erst,
+      als der Hinzufügen-Knopf zum Kreis wurde. Mögliche Wege: Leiste schmaler
+      und links ausrichten, oder ein Schließen-Kreuz statt der vollen Breite,
+      oder den Knopf während der Leiste ausblenden. Kleine Sache, aber sie
+      blockiert eine Aktion.
 - [ ] **Lose Ware: Menge und Füllstand widersprechen sich.** Beim Gouda steht
       „200 g" neben „50 %" — die 200 g sind das Kaufgewicht, nicht der Rest.
       Möglich wäre, daraus „ca. 100 g" abzuleiten. Frage dahinter: ist bei loser
