@@ -3,7 +3,15 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type Db } from './client';
 import { seedCategories, seedDevData } from './seed';
-import { category, product, productAlias, stockItem } from './schema';
+import {
+	FILL_LEVELS,
+	category,
+	product,
+	productAlias,
+	receipt,
+	receiptImage,
+	stockItem
+} from './schema';
 
 /** Frische Datenbank im Speicher — die Tests fassen data/kitchen.db nie an. */
 function freshDb(): Db {
@@ -111,6 +119,25 @@ describe('Bestandsabfrage', () => {
 		expect(times).toEqual([...times].sort((a, b) => a - b));
 	});
 
+	it('lässt ungeöffnete Ware ohne Füllstand', () => {
+		const rows = db.select().from(stockItem).all();
+		// Der Normalfall ist NULL: Füllstand ist eine Zusatzangabe, keine Pflicht.
+		expect(rows.filter((r) => r.fillLevel === null).length).toBeGreaterThan(0);
+	});
+
+	it('speichert Füllstände nur in den vier vorgesehenen Stufen', () => {
+		const opened = db
+			.select()
+			.from(stockItem)
+			.all()
+			.filter((r) => r.fillLevel !== null);
+
+		expect(opened.length).toBeGreaterThan(0);
+		for (const row of opened) {
+			expect(FILL_LEVELS).toContain(row.fillLevel as (typeof FILL_LEVELS)[number]);
+		}
+	});
+
 	it('blendet Aufgebrauchtes aus, ohne die Zeile zu löschen', () => {
 		const first = db.select().from(stockItem).get()!;
 		db.update(stockItem).set({ consumedAt: new Date() }).where(eq(stockItem.id, first.id)).run();
@@ -125,5 +152,40 @@ describe('Bestandsabfrage', () => {
 				.all()
 				.find((r) => r.id === first.id)
 		).toBeDefined();
+	});
+});
+
+describe('receipt_image', () => {
+	function makeReceipt(): number {
+		return db.insert(receipt).values({}).returning().get().id;
+	}
+
+	it('hält mehrere Fotos zu einem Bon in Reihenfolge', () => {
+		const id = makeReceipt();
+		db.insert(receiptImage)
+			.values([
+				{ receiptId: id, path: 'a/unten.jpg', sortOrder: 2 },
+				{ receiptId: id, path: 'a/oben.jpg', sortOrder: 0 },
+				{ receiptId: id, path: 'a/mitte.jpg', sortOrder: 1 }
+			])
+			.run();
+
+		const paths = db
+			.select({ path: receiptImage.path })
+			.from(receiptImage)
+			.where(eq(receiptImage.receiptId, id))
+			.orderBy(asc(receiptImage.sortOrder))
+			.all()
+			.map((r) => r.path);
+
+		expect(paths).toEqual(['a/oben.jpg', 'a/mitte.jpg', 'a/unten.jpg']);
+	});
+
+	it('räumt die Fotos mit auf, wenn der Bon gelöscht wird', () => {
+		const id = makeReceipt();
+		db.insert(receiptImage).values({ receiptId: id, path: 'a/oben.jpg' }).run();
+
+		db.delete(receipt).where(eq(receipt.id, id)).run();
+		expect(db.select().from(receiptImage).all()).toHaveLength(0);
 	});
 });

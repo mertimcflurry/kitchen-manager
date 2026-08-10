@@ -20,6 +20,12 @@ Mobile-first, große Touch-Ziele, Mengenänderung ohne Tastatur, „aufgebraucht
 in einer Geste, kein Formular-Ping-Pong. Wenn eine Interaktion umständlich
 wirkt: ansprechen, nicht kommentarlos umsetzen.
 
+Die Tastatur-Regel gilt für den **Kühlschrank-Ablauf**, nicht für Konfiguration.
+In den Einstellungen sitzt man, macht es selten, und „14" zu tippen schlägt
+vierzehnmal auf ein Plus zu drücken. Dasselbe für Schieberegler: im Bestand
+verboten (im Stehen nicht zu treffen, verlangt Scheingenauigkeit), sonst nach
+Lage. Füllstände laufen deshalb über vier feste Stufen, nicht über einen Regler.
+
 ## Hardware & Betrieb
 
 |               |                                                                |

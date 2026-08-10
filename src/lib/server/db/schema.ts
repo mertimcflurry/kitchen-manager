@@ -15,8 +15,20 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-or
 export const LOCATIONS = ['fridge', 'freezer', 'pantry'] as const;
 export const UNITS = ['piece', 'pack', 'g', 'ml'] as const;
 
+/**
+ * Füllstand angebrochener Ware, in Prozent.
+ *
+ * Eingegeben wird über vier große Knöpfe, nicht über einen Regler: einen
+ * Schieberegler im Stehen genau zu treffen ist die fummeligste Geste am
+ * Handy, und „ist die Milch bei 40 oder 55 Prozent?" kann ohnehin niemand
+ * beantworten. Gespeichert wird trotzdem eine Zahl, damit eine feinere
+ * Eingabe später ohne Migration möglich bliebe.
+ */
+export const FILL_LEVELS = [100, 75, 50, 25] as const;
+
 export type Location = (typeof LOCATIONS)[number];
 export type Unit = (typeof UNITS)[number];
+export type FillLevel = (typeof FILL_LEVELS)[number];
 
 /** Kategorie liefert die MHD-Schätzung, wenn das Produkt keine eigene hat. */
 export const category = sqliteTable('category', {
@@ -71,8 +83,16 @@ export const stockItem = sqliteTable(
 		bestBeforeIsEstimated: integer('best_before_is_estimated', { mode: 'boolean' })
 			.notNull()
 			.default(true),
-		/** „Angebrochen" als Schalter — spart das Rechnen mit Restmengen. */
-		isOpened: integer('is_opened', { mode: 'boolean' }).notNull().default(false),
+		/**
+		 * Füllstand in Prozent, oder NULL für ungeöffnet.
+		 *
+		 * Ein einziges Feld statt „angebrochen" plus Restmenge: damit gibt es
+		 * den widersprüchlichen Zustand „nicht angebrochen, aber ein Viertel
+		 * übrig" gar nicht erst. NULL heißt ungeöffnet, 100 heißt angebrochen
+		 * und noch voll. Bleibt optional — bei Dosen und Packungen zählt
+		 * weiterhin nur die Stückzahl.
+		 */
+		fillLevel: integer('fill_level'),
 		purchasedAt: integer('purchased_at', { mode: 'timestamp' })
 			.notNull()
 			.$defaultFn(() => new Date()),
@@ -96,8 +116,6 @@ export const receipt = sqliteTable(
 	'receipt',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
-		/** Pfad unter data/receipts/. Nach 90 Tagen aufräumen. */
-		imagePath: text('image_path').notNull(),
 		store: text('store'),
 		purchasedAt: integer('purchased_at', { mode: 'timestamp' }),
 		totalCents: integer('total_cents'),
@@ -111,6 +129,31 @@ export const receipt = sqliteTable(
 			.$defaultFn(() => new Date())
 	},
 	(t) => [index('receipt_status_idx').on(t.status)]
+);
+
+/**
+ * Ein Bon kann aus mehreren Fotos bestehen.
+ *
+ * Ein langer Kassenbon passt nicht in eine Aufnahme: zwingt man ihn ganz
+ * ins Bild, wird die Schrift so klein, dass auch ein starkes Vision-Modell
+ * nur noch rät. Drei Aufnahmen von oben, Mitte und unten werden gemeinsam
+ * ausgewertet — `sortOrder` hält dabei die Reihenfolge fest.
+ */
+export const receiptImage = sqliteTable(
+	'receipt_image',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		receiptId: integer('receipt_id')
+			.notNull()
+			.references(() => receipt.id, { onDelete: 'cascade' }),
+		/** Pfad unter data/receipts/. Nach 90 Tagen aufräumen. */
+		path: text('path').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.notNull()
+			.$defaultFn(() => new Date())
+	},
+	(t) => [index('receipt_image_receipt_idx').on(t.receiptId, t.sortOrder)]
 );
 
 /** Eine Zeile des Bons, wie das Modell sie gelesen hat. */
@@ -204,7 +247,12 @@ export const stockItemRelations = relations(stockItem, ({ one }) => ({
 }));
 
 export const receiptRelations = relations(receipt, ({ many }) => ({
-	lines: many(receiptLine)
+	lines: many(receiptLine),
+	images: many(receiptImage)
+}));
+
+export const receiptImageRelations = relations(receiptImage, ({ one }) => ({
+	receipt: one(receipt, { fields: [receiptImage.receiptId], references: [receipt.id] })
 }));
 
 export const receiptLineRelations = relations(receiptLine, ({ one }) => ({
@@ -229,6 +277,7 @@ export type NewProduct = typeof product.$inferInsert;
 export type StockItem = typeof stockItem.$inferSelect;
 export type NewStockItem = typeof stockItem.$inferInsert;
 export type Receipt = typeof receipt.$inferSelect;
+export type ReceiptImage = typeof receiptImage.$inferSelect;
 export type ReceiptLine = typeof receiptLine.$inferSelect;
 export type ProductAlias = typeof productAlias.$inferSelect;
 export type ShoppingListItem = typeof shoppingListItem.$inferSelect;

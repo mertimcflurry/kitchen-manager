@@ -1,7 +1,14 @@
 import { count, sql } from 'drizzle-orm';
 import { estimateBestBefore } from '../../date';
 import type { Db } from './client';
-import { category, product, stockItem, type NewCategory } from './schema';
+import {
+	category,
+	product,
+	stockItem,
+	type FillLevel,
+	type Location,
+	type NewCategory
+} from './schema';
 
 /*
  * Zählen hier bewusst über select(count()).get() und nicht über db.$count():
@@ -71,13 +78,15 @@ const DEV_PRODUCTS = [
 const DEV_STOCK: Array<{
 	product: string;
 	quantity: number;
-	location: 'fridge' | 'freezer' | 'pantry';
+	location: Location;
 	boughtDaysAgo: number;
-	opened?: boolean;
+	/** Prozent für angebrochene Ware, weggelassen heißt ungeöffnet. */
+	fill?: FillLevel;
 }> = [
 	{ product: 'Feldsalat', quantity: 1, location: 'fridge', boughtDaysAgo: 6 }, // abgelaufen
 	{ product: 'Vollkornbrot', quantity: 1, location: 'pantry', boughtDaysAgo: 4 }, // heute kritisch
-	{ product: 'Haferdrink', quantity: 1000, location: 'fridge', boughtDaysAgo: 8, opened: true },
+	// Angebrochen und fast leer — der Fall, aus dem spaeter ein Einkaufsvorschlag wird.
+	{ product: 'Haferdrink', quantity: 1000, location: 'fridge', boughtDaysAgo: 8, fill: 25 },
 	{ product: 'Gouda', quantity: 200, location: 'fridge', boughtDaysAgo: 18 },
 	{ product: 'Eier', quantity: 6, location: 'fridge', boughtDaysAgo: 5 },
 	{ product: 'Tofu natur', quantity: 2, location: 'fridge', boughtDaysAgo: 3 },
@@ -133,7 +142,7 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 				purchasedAt,
 				bestBefore: estimateBestBefore(purchasedAt, shelfLife),
 				bestBeforeIsEstimated: true,
-				isOpened: s.opened ?? false
+				fillLevel: s.fill ?? null
 			})
 			.run();
 	}

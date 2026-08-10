@@ -44,7 +44,7 @@ trotzdem sauber auswertbar.
 | `location`                 | text    | `fridge` \| `freezer` \| `pantry` (feste Liste)  |
 | `best_before`              | int?    | geschätzt oder überschrieben                     |
 | `best_before_is_estimated` | bool    | Schätzung wird in der UI anders dargestellt      |
-| `is_opened`                | bool    | „angebrochen" statt Restmengen-Rechnerei         |
+| `fill_level`               | int?    | Prozent bei Angebrochenem, NULL = ungeöffnet     |
 | `purchased_at`             | int     |                                                  |
 | `consumed_at`              | int?    | gesetzt = aufgebraucht; Basis für die Auswertung |
 | `receipt_id`               | int? FK | Herkunft, falls über Bon eingetragen             |
@@ -52,12 +52,21 @@ trotzdem sauber auswertbar.
 `consumed_at` statt Löschen: daraus ergibt sich „was ist typischerweise bald
 alle" ohne eine zweite Historientabelle.
 
+`fill_level` ersetzt ein reines „angebrochen"-Flag. Ein Feld statt zwei, damit
+es den widersprüchlichen Zustand „nicht angebrochen, aber ein Viertel übrig"
+nicht geben kann. Eingegeben über **vier Knöpfe** (voll / ¾ / ½ / ¼), nicht über
+einen Regler: einen Schieber im Stehen genau zu treffen ist die fummeligste
+Geste am Handy, und „40 oder 55 Prozent?" kann ohnehin niemand beantworten.
+Gespeichert wird trotzdem eine Zahl, damit feinere Eingabe später ohne Migration
+möglich bleibt. **Bleibt optional** — bei Dosen und Packungen zählt weiter nur
+die Stückzahl. Sobald ein Posten auf die unterste Stufe fällt, ist er Kandidat
+für die Einkaufsliste; das ist der eigentliche Zweck, nicht die Anzeige.
+
 ### `receipt` + `receipt_line` — Bon-Import
 
 | `receipt`      |        |                                                      |
 | -------------- | ------ | ---------------------------------------------------- |
 | `id`           | int PK |                                                      |
-| `image_path`   | text   | Datei unter `data/receipts/`                         |
 | `store`        | text?  | vom Modell erkannt                                   |
 | `purchased_at` | int?   |                                                      |
 | `status`       | text   | `pending` \| `confirmed` \| `discarded`              |
@@ -73,6 +82,15 @@ alle" ohne eine zweite Historientabelle.
 | `confidence`                  | text    | `high` \| `low` — Unsicheres wird im Prüf-Screen markiert |
 | `product_id`                  | int? FK | nach Zuordnung                                            |
 | `status`                      | text    | `pending` \| `accepted` \| `rejected`                     |
+
+### `receipt_image` — mehrere Fotos pro Bon
+
+`id` · `receipt_id` FK · `path` · `sort_order` · `created_at`
+
+Ein langer Kassenbon passt nicht in eine Aufnahme: zwingt man ihn ganz ins Bild,
+wird die Schrift so klein, dass auch ein starkes Vision-Modell nur noch rät.
+Drei Aufnahmen — oben, Mitte, unten — werden gemeinsam ausgewertet,
+`sort_order` hält die Reihenfolge.
 
 ### `product_alias` — die Lerntabelle
 
@@ -100,17 +118,22 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
       Orte als segmentierte Tabs oben, nicht als Dropdown.
 - [ ] **Schnellaktionen in der Liste** — kein Detail-Screen für den Normalfall.
       Große `−` / `+` direkt an der Zeile, Wischen nach rechts = aufgebraucht.
-- [ ] **Artikel-Detail** als Bottom-Sheet — nur für Ort, MHD, Einheit ändern.
+- [ ] **Artikel-Detail** als Bottom-Sheet — Ort, MHD, Einheit, Füllstand.
+      Füllstand als vier Knöpfe mit Balkenvorschau, nie als Regler.
 - [ ] **Schnell hinzufügen** — Chips der häufigsten Produkte zum Ein-Tap-Nachlegen,
       darunter erst die Suche. Das Meiste ist Nachkauf von immer demselben.
-- [ ] **Bon aufnehmen** — Kamera direkt aus der App.
+- [ ] **Bon aufnehmen** — großer Knopf geht direkt in die Kamera
+      (`capture="environment"`), darunter klein „aus der Galerie" ohne
+      `capture`, was iOS die Auswahl zeigen lässt. Mehrere Aufnahmen pro Bon.
 - [ ] **Bon prüfen** — Zeilen als Karten, Unsicheres hervorgehoben,
       „Alle übernehmen" als Primäraktion, Korrigieren als Ausnahme.
 - [ ] **Bald schlecht** — nach Dringlichkeit, mit „aufgebraucht"-Geste.
 - [ ] **Einkaufsliste** — manuell plus Vorschläge, abhaken mit großem Ziel.
 - [ ] **Was koche ich?** — ein Button, Vorschlag aus dem Bestand,
       Ablaufendes bevorzugt.
-- [ ] **Einstellungen** — Kategorien und ihre MHD-Defaults.
+- [ ] **Einstellungen** — Kategorien und ihre MHD-Defaults, direkt editierbar.
+      Der einzige Screen, auf dem eine Tastatur richtig ist: man sitzt dabei,
+      macht es selten, und „14" tippen schlägt vierzehnmal Plus drücken.
 
 ### UX-Grundsätze, die ich durchhalten will
 
@@ -163,10 +186,11 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [ ] Automatische Schätzung aus Kategorie beim Anlegen
 - [ ] Pro Artikel überschreibbar, Schätzung optisch unterscheidbar
 - [ ] „Bald schlecht"-Ansicht mit Ampel
+- [ ] Einstellungen: Kategorie-Haltbarkeiten editierbar (Tastatur erlaubt)
 
 ### M5 — Bon-Import
 
-- [ ] Upload und Kamera, Bild nach `data/receipts/`
+- [ ] Kamera direkt, Galerie als zweiter Weg, mehrere Fotos pro Bon
 - [ ] Anthropic Vision mit Structured Outputs, serverseitig
 - [ ] Prüf-Screen mit Korrigieren und Verwerfen
 - [ ] Übernahme ins Inventar in einer Transaktion
