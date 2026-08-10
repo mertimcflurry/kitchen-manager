@@ -6,6 +6,7 @@ import {
 	consume,
 	countByLocation,
 	listStock,
+	openOne,
 	setFillLevel,
 	undoConsume,
 	updateStockItem
@@ -68,6 +69,17 @@ export const actions: Actions = {
 			fillLevel: rawFill === null || rawFill === '' ? null : Number(rawFill)
 		});
 		return { ok: true };
+	},
+
+	/** Eine Einheit öffnen — teilt sie bei Mehrfachpackungen ab. */
+	open: async ({ request }) => {
+		const data = await request.formData();
+		const id = parseId(data);
+		if (!id) return fail(400, { message: 'Ungültig' });
+
+		const openedId = openOne(db, id);
+		if (openedId === null) return fail(409, { message: 'Nichts zu öffnen' });
+		return { ok: true, openedId };
 	},
 
 	fill: async ({ request }) => {

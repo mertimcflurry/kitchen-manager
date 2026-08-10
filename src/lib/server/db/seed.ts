@@ -27,6 +27,9 @@ function countStockItems(db: Db): number {
 /**
  * Startkategorien mit MHD-Schätzwerten.
  *
+ * `openedShelfLifeDays` gilt ab dem Öffnen und fehlt dort, wo Öffnen nichts
+ * ändert (Tiefkühl, Trockenvorrat, Eier).
+ *
  * Die Tage sind Erfahrungswerte für ungeöffnete Ware und bewusst eher knapp
  * gewählt: Eine zu kurze Schätzung führt zu einem überflüssigen Blick in den
  * Kühlschrank, eine zu lange zu weggeworfenem Essen. Pro Produkt überschreibbar.
@@ -34,18 +37,66 @@ function countStockItems(db: Db): number {
 export const DEFAULT_CATEGORIES: NewCategory[] = [
 	{ name: 'Obst & Gemüse', defaultShelfLifeDays: 7, emoji: '🥬', sortOrder: 10 },
 	{ name: 'Brot & Backwaren', defaultShelfLifeDays: 4, emoji: '🍞', sortOrder: 20 },
-	{ name: 'Milchprodukte', defaultShelfLifeDays: 10, emoji: '🥛', sortOrder: 30 },
-	{ name: 'Käse', defaultShelfLifeDays: 21, emoji: '🧀', sortOrder: 40 },
+	{
+		name: 'Milchprodukte',
+		defaultShelfLifeDays: 10,
+		openedShelfLifeDays: 5,
+		emoji: '🥛',
+		sortOrder: 30
+	},
+	{ name: 'Käse', defaultShelfLifeDays: 21, openedShelfLifeDays: 10, emoji: '🧀', sortOrder: 40 },
 	{ name: 'Eier', defaultShelfLifeDays: 21, emoji: '🥚', sortOrder: 50 },
-	{ name: 'Fleisch & Fisch', defaultShelfLifeDays: 3, emoji: '🥩', sortOrder: 60 },
-	{ name: 'Tofu & Fleischersatz', defaultShelfLifeDays: 90, emoji: '🌱', sortOrder: 70 },
-	{ name: 'Aufschnitt & Aufstriche', defaultShelfLifeDays: 14, emoji: '🥪', sortOrder: 80 },
+	{
+		name: 'Fleisch & Fisch',
+		defaultShelfLifeDays: 3,
+		openedShelfLifeDays: 2,
+		emoji: '🥩',
+		sortOrder: 60
+	},
+	{
+		name: 'Tofu & Fleischersatz',
+		defaultShelfLifeDays: 90,
+		openedShelfLifeDays: 4,
+		emoji: '🌱',
+		sortOrder: 70
+	},
+	{
+		name: 'Aufschnitt & Aufstriche',
+		defaultShelfLifeDays: 14,
+		openedShelfLifeDays: 5,
+		emoji: '🥪',
+		sortOrder: 80
+	},
 	{ name: 'Tiefkühl', defaultShelfLifeDays: 180, emoji: '❄️', sortOrder: 90 },
-	{ name: 'Konserven', defaultShelfLifeDays: 365, emoji: '🥫', sortOrder: 100 },
+	{
+		name: 'Konserven',
+		defaultShelfLifeDays: 365,
+		openedShelfLifeDays: 3,
+		emoji: '🥫',
+		sortOrder: 100
+	},
 	{ name: 'Trockenvorrat', defaultShelfLifeDays: 365, emoji: '🍝', sortOrder: 110 },
-	{ name: 'Gewürze & Saucen', defaultShelfLifeDays: 540, emoji: '🧂', sortOrder: 120 },
-	{ name: 'Süßes & Snacks', defaultShelfLifeDays: 90, emoji: '🍫', sortOrder: 130 },
-	{ name: 'Getränke', defaultShelfLifeDays: 180, emoji: '🧃', sortOrder: 140 },
+	{
+		name: 'Gewürze & Saucen',
+		defaultShelfLifeDays: 540,
+		openedShelfLifeDays: 60,
+		emoji: '🧂',
+		sortOrder: 120
+	},
+	{
+		name: 'Süßes & Snacks',
+		defaultShelfLifeDays: 90,
+		openedShelfLifeDays: 30,
+		emoji: '🍫',
+		sortOrder: 130
+	},
+	{
+		name: 'Getränke',
+		defaultShelfLifeDays: 180,
+		openedShelfLifeDays: 5,
+		emoji: '🧃',
+		sortOrder: 140
+	},
 	{ name: 'Sonstiges', defaultShelfLifeDays: 30, emoji: '📦', sortOrder: 999 }
 ];
 
@@ -62,7 +113,7 @@ export function seedCategories(db: Db): number {
 /** Entwicklungsdaten: genug Streuung, um Sortierung und Ampel zu sehen. */
 const DEV_PRODUCTS = [
 	{ name: 'Tofu natur', category: 'Tofu & Fleischersatz', unit: 'pack' as const, days: 90 },
-	{ name: 'Haferdrink', category: 'Milchprodukte', unit: 'ml' as const, days: 10 },
+	{ name: 'Haferdrink', category: 'Milchprodukte', unit: 'pack' as const, days: 90 },
 	{ name: 'Kichererbsen', category: 'Konserven', unit: 'pack' as const, days: 365 },
 	{ name: 'Feldsalat', category: 'Obst & Gemüse', unit: 'pack' as const, days: 4 },
 	{ name: 'Vollkornbrot', category: 'Brot & Backwaren', unit: 'piece' as const, days: 4 },
@@ -82,11 +133,22 @@ const DEV_STOCK: Array<{
 	boughtDaysAgo: number;
 	/** Prozent für angebrochene Ware, weggelassen heißt ungeöffnet. */
 	fill?: FillLevel;
+	/** Seit wann offen — kürzt das MHD auf die Geöffnet-Haltbarkeit. */
+	openedDaysAgo?: number;
 }> = [
 	{ product: 'Feldsalat', quantity: 1, location: 'fridge', boughtDaysAgo: 6 }, // abgelaufen
 	{ product: 'Vollkornbrot', quantity: 1, location: 'pantry', boughtDaysAgo: 4 }, // heute kritisch
-	// Angebrochen und fast leer — der Fall, aus dem spaeter ein Einkaufsvorschlag wird.
-	{ product: 'Haferdrink', quantity: 1000, location: 'fridge', boughtDaysAgo: 8, fill: 25 },
+	// Vier gekaufte Kartons, einer davon offen: drei verschlossene halten Monate,
+	// der angebrochene nur Tage. Deshalb zwei Posten, nicht einer mit Prozentwert.
+	{ product: 'Haferdrink', quantity: 3, location: 'pantry', boughtDaysAgo: 8 },
+	{
+		product: 'Haferdrink',
+		quantity: 1,
+		location: 'fridge',
+		boughtDaysAgo: 8,
+		fill: 50,
+		openedDaysAgo: 2
+	},
 	{ product: 'Gouda', quantity: 200, location: 'fridge', boughtDaysAgo: 18 },
 	{ product: 'Eier', quantity: 6, location: 'fridge', boughtDaysAgo: 5 },
 	{ product: 'Tofu natur', quantity: 2, location: 'fridge', boughtDaysAgo: 3 },
@@ -131,7 +193,16 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 		const purchasedAt = new Date(today);
 		purchasedAt.setDate(purchasedAt.getDate() - s.boughtDaysAgo);
 
-		const shelfLife = prod.shelfLifeDays ?? 30;
+		const cat = categoriesByName.get(DEV_PRODUCTS.find((p) => p.name === s.product)!.category)!;
+		const shelfLife = prod.shelfLifeDays ?? cat.defaultShelfLifeDays;
+
+		// Geöffnetes rechnet ab dem Öffnungstag mit der kürzeren Frist.
+		let bestBefore = estimateBestBefore(purchasedAt, shelfLife);
+		if (s.openedDaysAgo !== undefined && cat.openedShelfLifeDays !== null) {
+			const openedAt = new Date(today);
+			openedAt.setDate(openedAt.getDate() - s.openedDaysAgo);
+			bestBefore = estimateBestBefore(openedAt, cat.openedShelfLifeDays);
+		}
 
 		db.insert(stockItem)
 			.values({
@@ -140,7 +211,7 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 				unit: prod.defaultUnit,
 				location: s.location,
 				purchasedAt,
-				bestBefore: estimateBestBefore(purchasedAt, shelfLife),
+				bestBefore,
 				bestBeforeIsEstimated: true,
 				fillLevel: s.fill ?? null
 			})

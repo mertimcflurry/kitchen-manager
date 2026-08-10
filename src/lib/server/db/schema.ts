@@ -27,6 +27,13 @@ export const category = sqliteTable('category', {
 	name: text('name').notNull().unique(),
 	/** Obst 7, Tofu 90, Konserven 365 — Startwert, pro Produkt überschreibbar. */
 	defaultShelfLifeDays: integer('default_shelf_life_days').notNull(),
+	/**
+	 * Haltbarkeit ab dem Öffnen, falls das bei dieser Kategorie einen
+	 * Unterschied macht. Eine offene Dose hält drei Tage, keine 365 — ohne
+	 * diesen Wert stünde Geöffnetes viel zu weit unten in der Liste.
+	 * NULL heißt: Öffnen ändert nichts (Tiefkühl, Trockenvorrat).
+	 */
+	openedShelfLifeDays: integer('opened_shelf_life_days'),
 	/** Visueller Anker in der Liste. Ein Emoji liest sich schneller als ein Wort. */
 	emoji: text('emoji').notNull(),
 	sortOrder: integer('sort_order').notNull().default(0)
@@ -48,6 +55,8 @@ export const product = sqliteTable(
 		defaultUnit: text('default_unit', { enum: UNITS }).notNull().default('piece'),
 		/** Überschreibt die Kategorie-Haltbarkeit, wenn gesetzt. */
 		shelfLifeDays: integer('shelf_life_days'),
+		/** Ebenso für die Haltbarkeit nach dem Öffnen. */
+		openedShelfLifeDays: integer('opened_shelf_life_days'),
 		createdAt: integer('created_at', { mode: 'timestamp' })
 			.notNull()
 			.$defaultFn(() => new Date())

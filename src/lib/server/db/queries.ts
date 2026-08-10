@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import { estimateBestBefore } from '../../date';
+import { isCountable } from '../../domain';
 import type { Db } from './client';
 import { category, product, stockItem, type FillLevel, type Location, type Unit } from './schema';
 
@@ -109,6 +110,73 @@ export function undoConsume(db: Db, snapshot: ConsumedSnapshot): void {
 
 export function setFillLevel(db: Db, id: number, level: FillLevel | null): void {
 	db.update(stockItem).set({ fillLevel: level }).where(eq(stockItem.id, id)).run();
+}
+
+/**
+ * MHD, nachdem etwas geöffnet wurde.
+ *
+ * Öffnen verkürzt nur, es verlängert nie: eine Dose, die ohnehin morgen
+ * abläuft, wird durch das Öffnen nicht drei Tage haltbar. Fehlt für die
+ * Kategorie ein Wert, ändert Öffnen am Datum nichts (Tiefkühl, Trockenvorrat).
+ */
+function bestBeforeAfterOpening(db: Db, productId: number, current: Date | null): Date | null {
+	const row = db
+		.select({ own: product.openedShelfLifeDays, fallback: category.openedShelfLifeDays })
+		.from(product)
+		.innerJoin(category, eq(product.categoryId, category.id))
+		.where(eq(product.id, productId))
+		.get();
+
+	const days = row?.own ?? row?.fallback;
+	if (days == null) return current;
+
+	const opened = estimateBestBefore(new Date(), days);
+	return current !== null && current < opened ? current : opened;
+}
+
+/**
+ * Öffnet **eine** Einheit eines Postens.
+ *
+ * Vier verschlossene Kartons Hafermilch und einer davon angebrochen sind zwei
+ * verschiedene Dinge, nicht eines mit einem Prozentwert: der offene hält Tage,
+ * die anderen Monate. Deshalb wird abgeteilt statt markiert — das Schema kann
+ * mehrere Posten je Produkt, genau dafür.
+ *
+ * Gibt die ID des geöffneten Postens zurück, oder null, wenn nichts zu öffnen war.
+ */
+export function openOne(db: Db, id: number): number | null {
+	const item = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
+	if (!item || item.consumedAt || item.fillLevel !== null) return null;
+
+	const bestBefore = bestBeforeAfterOpening(db, item.productId, item.bestBefore);
+
+	// Lose Ware und Einzelstücke werden an Ort und Stelle geöffnet — es gibt
+	// nichts abzuteilen.
+	if (!isCountable(item.unit) || item.quantity <= 1) {
+		db.update(stockItem).set({ fillLevel: 100, bestBefore }).where(eq(stockItem.id, id)).run();
+		return item.id;
+	}
+
+	db.update(stockItem)
+		.set({ quantity: item.quantity - 1 })
+		.where(eq(stockItem.id, id))
+		.run();
+
+	return db
+		.insert(stockItem)
+		.values({
+			productId: item.productId,
+			quantity: 1,
+			unit: item.unit,
+			location: item.location,
+			bestBefore,
+			bestBeforeIsEstimated: item.bestBeforeIsEstimated,
+			fillLevel: 100,
+			purchasedAt: item.purchasedAt,
+			receiptId: item.receiptId
+		})
+		.returning({ id: stockItem.id })
+		.get().id;
 }
 
 export function updateStockItem(

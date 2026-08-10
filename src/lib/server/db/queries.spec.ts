@@ -11,10 +11,11 @@ import {
 	findOrCreateProduct,
 	frequentProducts,
 	listStock,
+	openOne,
 	undoConsume
 } from './queries';
 import { seedCategories, seedDevData } from './seed';
-import { product, stockItem } from './schema';
+import { category, product, stockItem } from './schema';
 
 let db: Db;
 beforeEach(() => {
@@ -142,5 +143,104 @@ describe('frequentProducts', () => {
 		}
 
 		expect(frequentProducts(db, 3)[0].name).toBe('Tofu natur');
+	});
+});
+
+describe('openOne', () => {
+	/** Vier Kartons Hafermilch, einer wird angebrochen. */
+	function fourPacks() {
+		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
+		const id = addStock(db, { productId: milk.id, quantity: 4, location: 'pantry' });
+		return { milk, id };
+	}
+
+	it('teilt eine Einheit ab, statt die ganze Zeile zu markieren', () => {
+		const { milk, id } = fourPacks();
+		const openedId = openOne(db, id);
+
+		const rows = listStock(db).filter((r) => r.productId === milk.id && r.id !== 0);
+		const sealed = rows.find((r) => r.id === id);
+		const opened = rows.find((r) => r.id === openedId);
+
+		expect(sealed?.quantity).toBe(3);
+		expect(sealed?.fillLevel).toBeNull();
+		expect(opened?.quantity).toBe(1);
+		expect(opened?.fillLevel).toBe(100);
+	});
+
+	it('gibt dem Geöffneten die kürzere Haltbarkeit', () => {
+		const { id } = fourPacks();
+		const openedId = openOne(db, id)!;
+
+		const opened = db.select().from(stockItem).where(eq(stockItem.id, openedId)).get()!;
+		const sealed = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+
+		// Milchprodukte: 5 Tage ab dem Öffnen statt 90 des Produkts.
+		expect(daysUntil(opened.bestBefore!)).toBe(5);
+		expect(daysUntil(sealed.bestBefore!)).toBeGreaterThan(5);
+	});
+
+	it('verlängert nie — was morgen abläuft, hält durch Öffnen nicht länger', () => {
+		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
+		const id = addStock(db, { productId: milk.id, quantity: 1, location: 'fridge' });
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		db.update(stockItem).set({ bestBefore: tomorrow }).where(eq(stockItem.id, id)).run();
+
+		openOne(db, id);
+		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+		expect(daysUntil(row.bestBefore!)).toBe(1);
+	});
+
+	it('öffnet Einzelstücke an Ort und Stelle, ohne Leerposten', () => {
+		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
+		const id = addStock(db, { productId: milk.id, quantity: 1, location: 'fridge' });
+
+		expect(openOne(db, id)).toBe(id);
+		expect(listStock(db).filter((r) => r.productId === milk.id && r.quantity === 0)).toHaveLength(
+			0
+		);
+	});
+
+	it('öffnet lose Ware an Ort und Stelle, statt ein Gramm abzuteilen', () => {
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		const id = addStock(db, { productId: cheese.id, quantity: 200, location: 'fridge' });
+
+		expect(openOne(db, id)).toBe(id);
+		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+		expect(row.quantity).toBe(200);
+		expect(row.fillLevel).toBe(100);
+	});
+
+	it('lässt bereits Geöffnetes in Ruhe', () => {
+		const { id } = fourPacks();
+		const openedId = openOne(db, id)!;
+		expect(openOne(db, openedId)).toBeNull();
+	});
+
+	it('lässt das Datum unberührt, wo Öffnen nichts ändert', () => {
+		// Tiefkühl hat keine Geöffnet-Haltbarkeit — aufgetaute Erbsen sind ein
+		// anderes Problem als eine offene Dose.
+		const peas = db.select().from(product).where(eq(product.name, 'Erbsen TK')).get()!;
+		const id = addStock(db, { productId: peas.id, quantity: 750, location: 'freezer' });
+		const before = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!.bestBefore;
+
+		openOne(db, id);
+		const after = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+		expect(after.bestBefore).toEqual(before);
+		expect(after.fillLevel).toBe(100);
+	});
+});
+
+describe('Geöffnet-Haltbarkeit der Kategorien', () => {
+	it('ist dort gesetzt, wo Öffnen einen Unterschied macht', () => {
+		const rows = db.select().from(category).all();
+		const byName = new Map(rows.map((c) => [c.name, c.openedShelfLifeDays]));
+
+		expect(byName.get('Konserven')).toBe(3);
+		expect(byName.get('Milchprodukte')).toBe(5);
+		// Und dort NULL, wo es keinen macht.
+		expect(byName.get('Tiefkühl')).toBeNull();
+		expect(byName.get('Trockenvorrat')).toBeNull();
 	});
 });

@@ -52,6 +52,20 @@ trotzdem sauber auswertbar.
 `consumed_at` statt Löschen: daraus ergibt sich „was ist typischerweise bald
 alle" ohne eine zweite Historientabelle.
 
+**Angebrochenes wird abgeteilt, nicht markiert.** Vier verschlossene Kartons
+Hafermilch und einer davon offen sind zwei verschiedene Dinge, nicht eines mit
+einem Prozentwert: der offene hält Tage, die anderen Monate. „Öffnen" nimmt
+deshalb **eine** Einheit aus dem Posten heraus und legt sie als eigenen an. Das
+Schema kann mehrere Posten je Produkt — genau dafür.
+
+Daraus folgt `opened_shelf_life_days` an Kategorie und Produkt: eine offene
+Dose hält drei Tage, keine 365. Öffnen verkürzt dabei nur, es verlängert nie.
+Wo Öffnen nichts ändert (Tiefkühl, Trockenvorrat), steht NULL.
+
+`unit` ist die **Zähleinheit**, nicht die Inhaltsmenge: vier Packungen, nicht
+4000 ml. Die Packungsgröße verwaltet die App bewusst nicht — sie hilft beim
+Blick in den Kühlschrank nicht und macht jede Eingabe länger.
+
 `fill_level` ersetzt ein reines „angebrochen"-Flag. Ein Feld statt zwei, damit
 es den widersprüchlichen Zustand „nicht angebrochen, aber ein Viertel übrig"
 nicht geben kann. Eingegeben über **vier Knöpfe** (voll / ¾ / ½ / ¼), nicht über
@@ -178,7 +192,8 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [x] +/- ohne Tastatur, optimistisch; auf null heißt aufgebraucht
 - [x] „Aufgebraucht" per Wischen nach rechts, Undo-Leiste statt Dialog
 - [x] Schnell hinzufügen: Häufigkeits-Chips, Sofortsuche, Neuanlage
-- [x] Artikel-Detail als Bottom-Sheet: Füllstand, Ort, MHD, Aufgebraucht
+- [x] Artikel-Detail als Bottom-Sheet: Öffnen/Füllstand, Ort, MHD, Aufgebraucht
+- [x] Öffnen teilt eine Einheit ab und verkürzt deren MHD
 - [ ] **Am Handy vor dem Kühlschrank testen, bevor es weitergeht**
 
 ### M4 — MHD

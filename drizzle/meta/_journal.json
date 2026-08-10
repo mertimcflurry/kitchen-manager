@@ -22,6 +22,20 @@
       "when": 1786398809262,
       "tag": "0002_cheerful_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786400952391,
+      "tag": "0003_condemned_moon_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786401137273,
+      "tag": "0004_backfill_opened_shelf_life",
+      "breakpoints": true
     }
   ]
 }

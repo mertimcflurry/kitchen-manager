@@ -66,11 +66,15 @@ mitpflegen, sonst kommt vom Handy nur „Blocked request".
 ```
 src/
 ├── lib/
-│   ├── server/         # NUR serverseitig: db/, ai/, Secrets
-│   │   ├── db/         # Drizzle-Schema, Migrationen, Queries
+│   ├── server/         # NUR serverseitig — nie aus Komponenten importieren
+│   │   ├── db/
+│   │   │   ├── client.ts   # Verbindung und Pragmas, ohne Kit-Importe
+│   │   │   ├── schema.ts   # Drizzle-Tabellen und Relationen
+│   │   │   ├── queries.ts  # alle Abfragen und Mutationen, testbar ohne Kit
+│   │   │   └── seed.ts     # Kategorien und Testdaten
 │   │   └── ai/         # Anthropic-Aufrufe, Prompts, Schemas
-│   │   └── db/queries.ts  # alle Abfragen und Mutationen, testbar ohne Kit
 │   ├── components/     # wiederverwendbare Svelte-Komponenten
+│   ├── domain.ts       # geteiltes Vokabular: Orte, Einheiten, Beschriftungen
 │   └── date.ts         # MHD-Rechnerei, reine Funktionen mit Tests daneben
 ├── routes/
 │   ├── +layout.svelte  # App-Shell: Rahmen, Bottom-Nav
@@ -100,6 +104,12 @@ Commit-Messages englisch.
 niemals im Client. Mutationen als SvelteKit **Form Actions**, damit es ohne
 JS-Roundtrip schnell bleibt.
 
+**Bestandsposten sind Chargen, keine Summen.** `unit` ist die Zähleinheit
+(vier Packungen), nicht die Inhaltsmenge (4000 ml). Angebrochenes wird
+abgeteilt: „Öffnen" nimmt eine Einheit heraus und legt sie als eigenen Posten
+an, mit eigenem, kürzerem MHD. Eine Zeile ist deshalb entweder komplett
+verschlossen oder ein einzelnes geöffnetes Stück — nie beides gemischt.
+
 **Kein Auth.** Die App hängt hinter Tailscale. Keine Login-Maske, keine
 Sessions, keine Nutzer-Tabelle.
 
@@ -114,6 +124,12 @@ Vokabular — Orte, Einheiten, Füllstufen, Beschriftungen — liegt deshalb in
 verschwinden beim Kompilieren; Laufzeitwerte nicht.
 
 **Datenbank-Fallstricke, die hier schon zugeschlagen haben:**
+
+- Neue Spalten mit Standardwerten brauchen eine **Backfill-Migration**.
+  `seedCategories()` ist absichtlich rein ergänzend und rührt bestehende Zeilen
+  nicht an — sonst überschriebe es angepasste Werte. Damit bleibt eine neu
+  hinzugefügte Spalte auf vorhandenen Zeilen aber NULL. Muster dafür:
+  `drizzle/0004_backfill_opened_shelf_life.sql` (UPDATE … WHERE … IS NULL).
 
 - `db.$count(table)` gibt im better-sqlite3-Treiber **keine Zahl** zurück,
   sondern einen Builder. Als Objekt ist der immer wahrheitswertig, `> 0`

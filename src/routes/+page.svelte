@@ -20,7 +20,17 @@
 	 */
 	let items = $derived(data.items.map((i) => ({ ...i })));
 
-	let sheetItem = $state<Row | null>(null);
+	/**
+	 * Das Sheet merkt sich nur die ID, nicht den Artikel.
+	 *
+	 * Hielte es eine Kopie, zeigte es nach dem Speichern weiter den Stand von
+	 * dem Moment, in dem es geöffnet wurde — die Liste dahinter aktualisiert
+	 * sich, das Formular nicht. Über die ID nachzuschlagen heißt: eine Quelle.
+	 */
+	let sheetId = $state<number | null>(null);
+	const sheetItem = $derived(
+		sheetId === null ? null : (items.find((i) => i.id === sheetId) ?? null)
+	);
 	let undoState = $state<{ id: number; quantity: number; fillLevel: number | null } | null>(null);
 	let undoLabel = $state('');
 
@@ -54,7 +64,7 @@
 
 	async function consume(item: Row) {
 		items = items.filter((i) => i.id !== item.id);
-		sheetItem = null;
+		sheetId = null;
 		undoLabel = `${item.name} aufgebraucht`;
 		undoState = { id: item.id, quantity: item.quantity, fillLevel: item.fillLevel };
 
@@ -89,28 +99,27 @@
 {:else}
 	<ul class="space-y-2">
 		{#each items as item (item.id)}
-			<StockRow {item} onAdjust={adjust} onConsume={consume} onOpen={(i) => (sheetItem = i)} />
+			<StockRow {item} onAdjust={adjust} onConsume={consume} onOpen={(i) => (sheetId = i.id)} />
 		{/each}
 	</ul>
 {/if}
 
-<!-- Im Daumenbereich, direkt über der Navigation. -->
-<div
-	class="fixed inset-x-0 z-30 flex justify-center px-4"
+<!-- Kleiner Kreis im Daumenbereich rechts, statt einer Leiste quer ueber die
+     Liste: die Aktion ist haeufig genug fuer einen festen Platz, aber nicht
+     wichtig genug, um die Haelfte der letzten Zeile zu verdecken. -->
+<a
+	href={resolve('/hinzufuegen')}
+	aria-label="Artikel hinzufügen"
+	class="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900
+		text-3xl leading-none text-white shadow-lg transition active:scale-95 dark:bg-zinc-100
+		dark:text-zinc-900"
 	style="bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px))"
 >
-	<a
-		href={resolve('/hinzufuegen')}
-		class="flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-full
-			bg-zinc-900 font-medium text-white shadow-lg transition active:scale-95
-			dark:bg-zinc-100 dark:text-zinc-900"
-	>
-		<span class="text-lg leading-none">+</span> Artikel hinzufügen
-	</a>
-</div>
+	<span class="-mt-0.5">+</span>
+</a>
 
 {#if sheetItem}
-	<ItemSheet item={sheetItem} onClose={() => (sheetItem = null)} onConsume={consume} />
+	<ItemSheet item={sheetItem} onClose={() => (sheetId = null)} onConsume={consume} />
 {/if}
 
 {#if undoState}

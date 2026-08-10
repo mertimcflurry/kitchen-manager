@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { StockRow } from '$lib/server/db/queries';
-	import { FILL_LABELS, FILL_LEVELS, LOCATIONS, LOCATION_LABELS } from '$lib/domain';
+	import { FILL_LABELS, FILL_LEVELS, LOCATIONS, LOCATION_LABELS, isCountable } from '$lib/domain';
 	import FillBar from './FillBar.svelte';
 
 	type Props = { item: StockRow; onClose: () => void; onConsume: (item: StockRow) => void };
 	let { item, onClose, onConsume }: Props = $props();
+
+	const isOpen = $derived(item.fillLevel !== null);
+	/** Mehrere verschlossene Einheiten: eine davon wird abgeteilt, nicht alle markiert. */
+	const splitsOnOpen = $derived(isCountable(item.unit) && item.quantity > 1);
 
 	/** <input type="date"> erwartet YYYY-MM-DD in Ortszeit, nicht in UTC. */
 	function toDateInput(date: Date | null): string {
@@ -42,41 +46,63 @@
 		</span>
 	</h2>
 
-	<!-- Füllstand: vier Knöpfe, kein Regler. Im Stehen trifft man Stufen, keine Prozente. -->
 	<section class="mb-6">
-		<div class="mb-2 flex items-center justify-between">
-			<h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Füllstand</h3>
-			{#if item.fillLevel !== null}
-				<FillBar level={item.fillLevel} />
-			{/if}
-		</div>
-		<form method="POST" action="?/fill" use:enhance class="flex gap-2">
-			<input type="hidden" name="id" value={item.id} />
-			<button
-				type="submit"
-				name="level"
-				value=""
-				class="min-h-12 flex-1 rounded-xl border text-sm transition active:scale-95 {item.fillLevel ===
-				null
-					? 'border-emerald-600 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-400'
-					: 'border-zinc-300 dark:border-zinc-700'}"
-			>
-				zu
-			</button>
-			{#each FILL_LEVELS as level (level)}
+		{#if isOpen}
+			<!-- Füllstand: vier Knöpfe, kein Regler. Im Stehen trifft man Stufen,
+			     keine Prozente. -->
+			<div class="mb-2 flex items-center justify-between">
+				<h3 class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Füllstand</h3>
+				<FillBar level={item.fillLevel ?? 0} />
+			</div>
+			<form method="POST" action="?/fill" use:enhance class="flex gap-2">
+				<input type="hidden" name="id" value={item.id} />
+				{#each FILL_LEVELS as level (level)}
+					<button
+						type="submit"
+						name="level"
+						value={level}
+						class="min-h-12 flex-1 rounded-xl border text-sm transition active:scale-95 {item.fillLevel ===
+						level
+							? 'border-emerald-600 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-400'
+							: 'border-zinc-300 dark:border-zinc-700'}"
+					>
+						{FILL_LABELS[level]}
+					</button>
+				{/each}
+			</form>
+			<form method="POST" action="?/fill" use:enhance class="mt-2">
+				<input type="hidden" name="id" value={item.id} />
+				<!-- Rückweg für den Fehlgriff. Das Datum bleibt, wie es ist — was
+				     einmal offen war, wird nicht wieder länger haltbar. -->
 				<button
 					type="submit"
 					name="level"
-					value={level}
-					class="min-h-12 flex-1 rounded-xl border text-sm transition active:scale-95 {item.fillLevel ===
-					level
-						? 'border-emerald-600 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-400'
-						: 'border-zinc-300 dark:border-zinc-700'}"
+					value=""
+					class="text-xs text-zinc-500 underline dark:text-zinc-400"
 				>
-					{FILL_LABELS[level]}
+					doch nicht geöffnet
 				</button>
-			{/each}
-		</form>
+			</form>
+		{:else}
+			<h3 class="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">Angebrochen?</h3>
+			<form method="POST" action="?/open" use:enhance>
+				<input type="hidden" name="id" value={item.id} />
+				<button
+					type="submit"
+					class="min-h-12 w-full rounded-xl border border-zinc-300 text-sm transition
+						active:scale-95 dark:border-zinc-700"
+				>
+					{splitsOnOpen ? 'Eine öffnen' : 'Öffnen'}
+				</button>
+			</form>
+			<p class="mt-2 text-xs text-zinc-400">
+				{#if splitsOnOpen}
+					Wird als eigener Posten abgeteilt — die übrigen {item.quantity - 1} bleiben verschlossen.
+				{:else}
+					Geöffnetes bekommt ein kürzeres Haltbarkeitsdatum.
+				{/if}
+			</p>
+		{/if}
 	</section>
 
 	<section class="mb-6">
