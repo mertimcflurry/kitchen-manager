@@ -1,5 +1,33 @@
-data/
-__pycache__/
-*.pyc
+# Dependencies
+node_modules/
+
+# Build-Artefakte
+.svelte-kit/
+build/
+.vite/
+
+# Secrets
 .env
-.venv/
+.env.*
+!.env.example
+
+# Datenbank (Bind-Mount, gehört nicht ins Repo)
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Hochgeladene Bon-Bilder
+uploads/
+static/uploads/
+
+# Editor / OS
+.DS_Store
+*.swp
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*

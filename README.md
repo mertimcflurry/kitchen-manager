@@ -1,39 +1,37 @@
 # Kitchen Manager
 
-Küchen-/Kühlschrank-Inventar für den Eigengebrauch. Aktuell nur ein
-Skeleton mit `Item`(name, quantity, unit, category, expiry_date) und einer
-einfachen JSON-API unter `/items` — Business-Logik und UI kommen über
-VS Code SSH dazu.
+Küchen- und Kühlschrankverwaltung für den Eigengebrauch. Ein Nutzer, läuft auf
+dem Raspberry Pi, erreichbar über Tailscale, bedient vom Handy vor dem
+Kühlschrank.
+
+Inventar mit Menge und Ort · Kassenbon per KI in Einzelposten zerlegen ·
+MHD-Schätzung nach Kategorie · Einkaufsvorschläge aus dem Kaufverhalten ·
+Rezeptvorschlag aus dem Bestand.
+
+**Stack:** SvelteKit 2 mit Svelte 5 (Runes), TypeScript, SQLite über Drizzle,
+Tailwind. Weicht bewusst vom Python-Standard-Stack in `~/projects/README.md` ab.
+
+## Dokumentation
+
+- [CLAUDE.md](CLAUDE.md) — Stack, Konventionen, Befehle, Grenzen des Projekts
+- [PLAN.md](PLAN.md) — Datenmodell, Screens, Meilensteine, offene Entscheidungen
+
+## Stand
+
+Kontext und Plan stehen, die Implementierung beginnt mit Meilenstein M1
+(Toolchain und Gerüst). Details in [PLAN.md](PLAN.md).
 
 ## Entwicklung
 
 ```bash
-cd ~/projects/kitchen-manager
-docker compose up -d --build
-docker compose logs -f
+npm run dev      # Dev-Server auf Port 5173
+npm run check    # TypeScript und svelte-check
+npm test         # Vitest
 ```
 
-- API: `http://<Pi-IP>:3001` (z.B. `GET /health`, `GET /items`, `POST /items`)
-- Docs (Swagger UI, automatisch von FastAPI): `http://<Pi-IP>:3001/docs`
-- Über Tailscale von unterwegs: `http://<Tailscale-IP-des-Pi>:3001`
-
-`app/` ist ins Container gemountet, `uvicorn --reload` läuft — Änderungen in
-VS Code wirken sofort, kein Rebuild nötig (Rebuild nur bei geänderten
-`requirements.txt`).
+Betrieb später als Container auf Port 3001 (`docker compose up -d --build`).
 
 ## Daten
 
-SQLite-DB liegt unter `./data/kitchen.db` (Bind-Mount, nicht in Git).
-
-## Stoppen / Neustart
-
-```bash
-docker compose down
-docker compose restart
-```
-
-## Nächste Schritte (Ideen)
-
-- Web-UI (z.B. Jinja2-Templates + HTMX, oder eigenes Frontend)
-- Ablaufdatum-Warnungen / Sortierung nach `expiry_date`
-- Barcode-Scan zum schnellen Hinzufügen
+SQLite unter `data/kitchen.db`, Bon-Bilder unter `data/receipts/` — beides
+Bind-Mount, nicht in Git. Secrets in `.env` (siehe `.env.example`).
