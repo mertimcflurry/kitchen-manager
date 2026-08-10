@@ -126,7 +126,21 @@ docker compose down
 - Aufrufe **ausschließlich** in `src/lib/server/ai/`. Der Key darf nie ins
   Frontend, nicht in `PUBLIC_*`-Variablen und nicht in Logs.
 - Key aus `.env`: `ANTHROPIC_API_KEY`. Modell aus `ANTHROPIC_MODEL`,
-  Default `claude-opus-5`.
+  Default `claude-sonnet-5`.
+- **Der Key gehört in `.env`, niemals in `.env.example`.** `.env` ist
+  gitignoriert, `.env.example` ausdrücklich nicht — sie geht mit ins Repo.
+  In `.env.example` steht nur ein leerer Platzhalter.
+- **Warum Sonnet 5 und nicht Haiku:** Bonschrift ist klein. Sonnet 5 und
+  Opus 5 verarbeiten Bilder bis 2576 px Kantenlänge, Haiku 4.5 nur bis
+  1568 px. Bei der Auflösung entscheidet sich, ob eine Zeile lesbar ist —
+  Haiku ist hier nicht „billiger", sondern womöglich untauglich. Sonnet 5
+  bietet Opus' Auflösung zu 40 % des Preises, und Belegposten zu extrahieren
+  ist keine Denkaufgabe. Für den Rezeptvorschlag (reiner Text, selten) darf
+  es Opus sein.
+- **Abrechnung:** Die API läuft über Prepaid-Guthaben von
+  console.anthropic.com und ist **nicht** vom Claude-Abo gedeckt. Guthaben
+  verfällt ein Jahr nach Kauf — bei diesem Verbrauch (~4 $/Jahr) also
+  kleine Beträge aufladen, nicht auf Vorrat.
 - **Bon-Parsing:** Vision-Aufruf mit Structured Outputs
   (`output_config.format`), damit die Antwort schema-konformes JSON ist statt
   Text zum Parsen. Ergebnis geht **immer** in einen Prüf-Screen, nie direkt
