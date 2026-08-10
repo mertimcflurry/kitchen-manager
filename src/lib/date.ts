@@ -41,3 +41,24 @@ export function freshness(bestBefore: Date, now: Date = new Date()): Freshness {
 	if (days <= FRESHNESS_THRESHOLDS.soon) return 'soon';
 	return 'fine';
 }
+
+/**
+ * Restlaufzeit in Worten.
+ *
+ * Im Nahbereich zählt der genaue Tag, weiter draußen nicht mehr: „in 8 Monaten"
+ * sagt beim Blick in den Vorrat mehr als „in 243 Tagen", und „heute" liest sich
+ * schneller als „in 0 Tagen".
+ */
+export function formatDaysUntil(target: Date, now: Date = new Date()): string {
+	const days = daysUntil(target, now);
+
+	if (days < -1) return `${Math.abs(days)} Tage über`;
+	if (days === -1) return 'gestern abgelaufen';
+	if (days === 0) return 'heute';
+	if (days === 1) return 'morgen';
+	if (days < 7) return `in ${days} Tagen`;
+	if (days < 14) return 'in einer Woche';
+	if (days < 60) return `in ${Math.round(days / 7)} Wochen`;
+	if (days < 365) return `in ${Math.round(days / 30)} Monaten`;
+	return 'über ein Jahr';
+}

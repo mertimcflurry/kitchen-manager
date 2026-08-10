@@ -69,6 +69,7 @@ src/
 │   ├── server/         # NUR serverseitig: db/, ai/, Secrets
 │   │   ├── db/         # Drizzle-Schema, Migrationen, Queries
 │   │   └── ai/         # Anthropic-Aufrufe, Prompts, Schemas
+│   │   └── db/queries.ts  # alle Abfragen und Mutationen, testbar ohne Kit
 │   ├── components/     # wiederverwendbare Svelte-Komponenten
 │   └── date.ts         # MHD-Rechnerei, reine Funktionen mit Tests daneben
 ├── routes/
@@ -104,6 +105,13 @@ Sessions, keine Nutzer-Tabelle.
 
 **Migrationen** immer über Drizzle generieren, nie das Schema von Hand am
 laufenden System ändern.
+
+**`npm run build` gehört zur Prüfung, nicht nur `check`.** Der Dev-Server lässt
+Importe aus `$lib/server/` in Browser-Code durch, der Build bricht sie ab
+(„Cannot import … as this could leak sensitive information"). Geteiltes
+Vokabular — Orte, Einheiten, Füllstufen, Beschriftungen — liegt deshalb in
+`src/lib/domain.ts`, nicht im Schema. `import type` ist unkritisch, Typen
+verschwinden beim Kompilieren; Laufzeitwerte nicht.
 
 **Datenbank-Fallstricke, die hier schon zugeschlagen haben:**
 

@@ -162,7 +162,7 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [x] `.env.example` mit `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
 - [x] `npm run dev` läuft, alle fünf Routen liefern 200 über die Tailscale-IP
 - [x] Mobile-Grundlayout: Bottom-Nav, Safe-Area, Touch-Ziele ≥ 44 px
-- [ ] **Am Handy gegengeprüft** — offen, das kann nur Mert selbst
+- [x] **Am Handy gegengeprüft** — bestätigt
 
 ### M2 — Datenmodell
 
@@ -174,11 +174,11 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### M3 — Inventar (das Herzstück)
 
-- [ ] Bestandsliste nach Ablauf, Ort-Tabs
-- [ ] +/- ohne Tastatur, optimistisch
-- [ ] „Aufgebraucht" per Wischen, mit Undo
-- [ ] Schnell hinzufügen mit Häufigkeits-Chips
-- [ ] Artikel-Detail als Bottom-Sheet
+- [x] Bestandsliste nach Ablauf, Ort-Tabs mit Anzahl, Ort in der URL
+- [x] +/- ohne Tastatur, optimistisch; auf null heißt aufgebraucht
+- [x] „Aufgebraucht" per Wischen nach rechts, Undo-Leiste statt Dialog
+- [x] Schnell hinzufügen: Häufigkeits-Chips, Sofortsuche, Neuanlage
+- [x] Artikel-Detail als Bottom-Sheet: Füllstand, Ort, MHD, Aufgebraucht
 - [ ] **Am Handy vor dem Kühlschrank testen, bevor es weitergeht**
 
 ### M4 — MHD

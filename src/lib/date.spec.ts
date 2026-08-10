@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, estimateBestBefore, freshness } from './date';
+import { daysUntil, estimateBestBefore, formatDaysUntil, freshness } from './date';
 
 describe('estimateBestBefore', () => {
 	it('addiert die Haltbarkeit in Kalendertagen', () => {
@@ -54,5 +54,35 @@ describe('freshness', () => {
 
 	it('lässt alles darüber in Ruhe', () => {
 		expect(freshness(new Date(2026, 7, 14), now)).toBe('fine');
+	});
+});
+
+describe('formatDaysUntil', () => {
+	const now = new Date(2026, 7, 10, 14, 30);
+	const inDays = (n: number) => {
+		const d = new Date(2026, 7, 10);
+		d.setDate(d.getDate() + n);
+		return d;
+	};
+
+	it('nennt den Nahbereich beim Namen statt in Zahlen', () => {
+		expect(formatDaysUntil(inDays(0), now)).toBe('heute');
+		expect(formatDaysUntil(inDays(1), now)).toBe('morgen');
+	});
+
+	it('zählt die nächsten Tage einzeln', () => {
+		expect(formatDaysUntil(inDays(3), now)).toBe('in 3 Tagen');
+	});
+
+	it('wird gröber, je weiter es weg ist', () => {
+		expect(formatDaysUntil(inDays(10), now)).toBe('in einer Woche');
+		expect(formatDaysUntil(inDays(30), now)).toBe('in 4 Wochen');
+		expect(formatDaysUntil(inDays(200), now)).toBe('in 7 Monaten');
+		expect(formatDaysUntil(inDays(400), now)).toBe('über ein Jahr');
+	});
+
+	it('sagt beim Abgelaufenen, wie lange schon', () => {
+		expect(formatDaysUntil(inDays(-1), now)).toBe('gestern abgelaufen');
+		expect(formatDaysUntil(inDays(-5), now)).toBe('5 Tage über');
 	});
 });

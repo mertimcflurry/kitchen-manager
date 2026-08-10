@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { LOCATIONS, UNITS } from '../../domain';
 
 /*
  * Konventionen in diesem Schema:
@@ -12,23 +13,13 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-or
  *   durch unseren typisierten Code.
  */
 
-export const LOCATIONS = ['fridge', 'freezer', 'pantry'] as const;
-export const UNITS = ['piece', 'pack', 'g', 'ml'] as const;
-
-/**
- * Füllstand angebrochener Ware, in Prozent.
- *
- * Eingegeben wird über vier große Knöpfe, nicht über einen Regler: einen
- * Schieberegler im Stehen genau zu treffen ist die fummeligste Geste am
- * Handy, und „ist die Milch bei 40 oder 55 Prozent?" kann ohnehin niemand
- * beantworten. Gespeichert wird trotzdem eine Zahl, damit eine feinere
- * Eingabe später ohne Migration möglich bliebe.
+/*
+ * Vokabular kommt aus $lib/domain, nicht von hier: Orte und Einheiten braucht
+ * die Oberfläche genauso. Läge es in dieser Datei, zöge jeder Import aus einer
+ * Komponente die Datenbank mit in den Browser-Bundle.
  */
-export const FILL_LEVELS = [100, 75, 50, 25] as const;
-
-export type Location = (typeof LOCATIONS)[number];
-export type Unit = (typeof UNITS)[number];
-export type FillLevel = (typeof FILL_LEVELS)[number];
+export { FILL_LEVELS, LOCATIONS, UNITS } from '../../domain';
+export type { FillLevel, Location, Unit } from '../../domain';
 
 /** Kategorie liefert die MHD-Schätzung, wenn das Produkt keine eigene hat. */
 export const category = sqliteTable('category', {

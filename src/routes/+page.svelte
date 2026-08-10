@@ -1,64 +1,123 @@
 <script lang="ts">
+	import { deserialize } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import ItemSheet from '$lib/components/ItemSheet.svelte';
+	import LocationTabs from '$lib/components/LocationTabs.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Snackbar from '$lib/components/Snackbar.svelte';
+	import StockRow from '$lib/components/StockRow.svelte';
+	import type { StockRow as Row } from '$lib/server/db/queries';
+	import type { PageData } from './$types';
 
-	// Attrappe ohne Datenbank. Steht hier, damit sich die Touch-Ziele und die
-	// Mengenaenderung schon am Handy anfuehlen lassen — die echte Liste kommt
-	// mit M3 aus SQLite.
-	type DemoItem = { id: number; name: string; unit: string; quantity: number };
+	let { data }: { data: PageData } = $props();
 
-	let items = $state<DemoItem[]>([
-		{ id: 1, name: 'Tofu natur', unit: 'Pck', quantity: 2 },
-		{ id: 2, name: 'Haferdrink', unit: 'l', quantity: 1 },
-		{ id: 3, name: 'Kichererbsen', unit: 'Dose', quantity: 4 }
-	]);
+	/**
+	 * Schreibbares $derived: die Liste kommt vom Server, darf aber lokal
+	 * vorgreifen. Sobald neue Serverdaten eintreffen, wird die Ableitung neu
+	 * berechnet und der Server gewinnt — genau das Verhalten, das optimistische
+	 * Updates brauchen, ohne eigenen Abgleich.
+	 */
+	let items = $derived(data.items.map((i) => ({ ...i })));
 
-	function step(item: DemoItem, by: number) {
-		item.quantity = Math.max(0, item.quantity + by);
+	let sheetItem = $state<Row | null>(null);
+	let undoState = $state<{ id: number; quantity: number; fillLevel: number | null } | null>(null);
+	let undoLabel = $state('');
+
+	/** Ruft eine Form Action auf, ohne dass ein sichtbares Formular nötig ist. */
+	async function post(action: string, fields: Record<string, string>) {
+		const body = new FormData();
+		for (const [key, value] of Object.entries(fields)) body.append(key, value);
+
+		const response = await fetch(`?/${action}`, { method: 'POST', body });
+		const result = deserialize(await response.text());
+		if (result.type === 'success' || result.type === 'failure') await invalidateAll();
+		return result;
+	}
+
+	async function adjust(item: Row, delta: number) {
+		const next = Math.max(0, item.quantity + delta);
+
+		// Optimistisch: die Zeile reagiert im selben Frame, nicht erst nach dem
+		// Roundtrip zum Pi.
+		if (next === 0) {
+			items = items.filter((i) => i.id !== item.id);
+			undoState = { id: item.id, quantity: item.quantity, fillLevel: item.fillLevel };
+			undoLabel = `${item.name} aufgebraucht`;
+		} else {
+			const target = items.find((i) => i.id === item.id);
+			if (target) target.quantity = next;
+		}
+
+		await post('adjust', { id: String(item.id), delta: String(delta) });
+	}
+
+	async function consume(item: Row) {
+		items = items.filter((i) => i.id !== item.id);
+		sheetItem = null;
+		undoLabel = `${item.name} aufgebraucht`;
+		undoState = { id: item.id, quantity: item.quantity, fillLevel: item.fillLevel };
+
+		await post('consume', { id: String(item.id) });
+	}
+
+	async function undo() {
+		const snapshot = undoState;
+		undoState = null;
+		if (!snapshot) return;
+
+		await post('undo', {
+			id: String(snapshot.id),
+			quantity: String(snapshot.quantity),
+			fillLevel: snapshot.fillLevel === null ? '' : String(snapshot.fillLevel)
+		});
 	}
 </script>
 
-<PageHeader title="Bestand" subtitle="Attrappe für den Layout-Test" />
+<PageHeader title="Bestand" subtitle="Was zuerst weg muss, steht oben" />
 
-<ul class="space-y-2">
-	{#each items as item (item.id)}
-		<li
-			class="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3
-				dark:border-zinc-800 dark:bg-zinc-900"
-		>
-			<div class="min-w-0 flex-1">
-				<p class="truncate font-medium">{item.name}</p>
-				<p class="text-sm text-zinc-500 dark:text-zinc-400">
-					{item.quantity}
-					{item.unit}
-				</p>
-			</div>
+<LocationTabs active={data.location} counts={data.counts} />
 
-			<!-- 44 px ist das Minimum, unter dem Tippen im Stehen unzuverlaessig wird. -->
-			<div class="flex items-center gap-1">
-				<button
-					type="button"
-					onclick={() => step(item, -1)}
-					aria-label="{item.name}: eins weniger"
-					class="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-300
-						text-xl leading-none transition active:scale-95 active:bg-zinc-100
-						dark:border-zinc-700 dark:active:bg-zinc-800"
-				>
-					−
-				</button>
-				<button
-					type="button"
-					onclick={() => step(item, 1)}
-					aria-label="{item.name}: eins mehr"
-					class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-xl
-						leading-none text-white transition active:scale-95 dark:bg-emerald-500"
-				>
-					+
-				</button>
-			</div>
-		</li>
-	{/each}
-</ul>
+{#if items.length === 0}
+	<div
+		class="rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700"
+	>
+		<p class="text-zinc-500 dark:text-zinc-400">
+			{data.location ? 'Hier liegt gerade nichts.' : 'Der Bestand ist leer.'}
+		</p>
+	</div>
+{:else}
+	<ul class="space-y-2">
+		{#each items as item (item.id)}
+			<StockRow {item} onAdjust={adjust} onConsume={consume} onOpen={(i) => (sheetItem = i)} />
+		{/each}
+	</ul>
+{/if}
 
-<p class="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
-	Echte Liste aus SQLite, Wisch-Geste und Undo kommen mit M3.
-</p>
+<!-- Im Daumenbereich, direkt über der Navigation. -->
+<div
+	class="fixed inset-x-0 z-30 flex justify-center px-4"
+	style="bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px))"
+>
+	<a
+		href={resolve('/hinzufuegen')}
+		class="flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-full
+			bg-zinc-900 font-medium text-white shadow-lg transition active:scale-95
+			dark:bg-zinc-100 dark:text-zinc-900"
+	>
+		<span class="text-lg leading-none">+</span> Artikel hinzufügen
+	</a>
+</div>
+
+{#if sheetItem}
+	<ItemSheet item={sheetItem} onClose={() => (sheetItem = null)} onConsume={consume} />
+{/if}
+
+{#if undoState}
+	<Snackbar
+		message={undoLabel}
+		actionLabel="Rückgängig"
+		onAction={undo}
+		onDismiss={() => (undoState = null)}
+	/>
+{/if}
