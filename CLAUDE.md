@@ -99,6 +99,16 @@ Sessions, keine Nutzer-Tabelle.
 **Migrationen** immer über Drizzle generieren, nie das Schema von Hand am
 laufenden System ändern.
 
+**Datenbank-Fallstricke, die hier schon zugeschlagen haben:**
+
+- `db.$count(table)` gibt im better-sqlite3-Treiber **keine Zahl** zurück,
+  sondern einen Builder. Als Objekt ist der immer wahrheitswertig, `> 0`
+  ist also still falsch. Stattdessen `db.select({ n: count() }).from(t).get()`.
+- Skripte außerhalb von SvelteKit dürfen `src/lib/server/db/index.ts` nicht
+  importieren (`$env` löst dort nicht auf). Sie nehmen `createDb()` aus
+  `client.ts` und lesen `process.env` selbst — so gelten überall dieselben
+  Pragmas.
+
 ## Befehle
 
 ```bash
@@ -113,6 +123,8 @@ npm run test:unit      # Vitest im Watch-Modus
 
 npm run db:generate    # Migration aus Schema-Änderung erzeugen
 npm run db:migrate     # Migrationen anwenden
+npm run db:seed        # Kategorien anlegen — idempotent, auch produktiv sicher
+npm run db:seed:dev    # zusätzlich Testprodukte und Bestand
 npm run db:studio      # Drizzle Studio, DB im Browser ansehen
 npm run db:push        # Schema direkt pushen — nur zum Wegwerf-Experimentieren
 

@@ -143,10 +143,11 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### M2 — Datenmodell
 
-- [ ] Drizzle-Schema nach Abschnitt 1
-- [ ] Migrationen erzeugen und anwenden
-- [ ] Kategorien mit MHD-Defaults seeden
-- [ ] Testdaten zum Entwickeln
+- [x] Drizzle-Schema nach Abschnitt 1 — 7 Tabellen, Indizes, Relationen
+- [x] Migrationen erzeugen und anwenden (`drizzle/0000_*.sql`)
+- [x] 15 Kategorien mit MHD-Defaults geseedet, idempotent
+- [x] Testdaten mit Streuung über alle vier Ampelstufen
+- [x] Tests: Idempotenz, Fremdschlüssel, Alias-Eindeutigkeit, Sortierung
 
 ### M3 — Inventar (das Herzstück)
 
