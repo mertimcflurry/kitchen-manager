@@ -1,6 +1,14 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { FILL_LEVELS, LOCATIONS, type FillLevel, type Location } from '$lib/domain';
+import {
+	FILL_LEVELS,
+	INPUT_UNITS,
+	LOCATIONS,
+	toBaseUnit,
+	type FillLevel,
+	type InputUnit,
+	type Location
+} from '$lib/domain';
 import {
 	adjustQuantity,
 	consume,
@@ -107,6 +115,23 @@ export const actions: Actions = {
 		const location = parseLocation(data.get('location') as string | null);
 		const rawDate = data.get('bestBefore');
 
+		// Menge kommt in der Einheit, die im Formular stand — kg und l werden
+		// auf die Basiseinheit umgerechnet, damit die Datenbank vergleichbar bleibt.
+		let quantity: number | undefined;
+		let unit: ReturnType<typeof toBaseUnit>['unit'] | undefined;
+		const rawQuantity = data.get('quantity');
+		const rawUnit = data.get('unit');
+		if (typeof rawQuantity === 'string' && rawQuantity !== '') {
+			// Deutsches Dezimalkomma zulassen — die Tastatur bietet es an.
+			const parsed = Number(rawQuantity.replace(',', '.'));
+			if (!Number.isFinite(parsed) || parsed < 0) return fail(400, { message: 'Menge unlesbar' });
+			if (!INPUT_UNITS.includes(rawUnit as InputUnit))
+				return fail(400, { message: 'Einheit unbekannt' });
+			const base = toBaseUnit(parsed, rawUnit as InputUnit);
+			quantity = base.quantity;
+			unit = base.unit;
+		}
+
 		let bestBefore: Date | null | undefined;
 		if (typeof rawDate === 'string') {
 			if (rawDate === '') {
@@ -120,7 +145,7 @@ export const actions: Actions = {
 			}
 		}
 
-		updateStockItem(db, id, { location, bestBefore });
+		updateStockItem(db, id, { location, bestBefore, quantity, unit });
 		return { ok: true };
 	}
 };

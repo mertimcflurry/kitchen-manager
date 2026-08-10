@@ -182,11 +182,14 @@ export function openOne(db: Db, id: number): number | null {
 export function updateStockItem(
 	db: Db,
 	id: number,
-	patch: { location?: Location; unit?: Unit; bestBefore?: Date | null }
+	patch: { location?: Location; unit?: Unit; quantity?: number; bestBefore?: Date | null }
 ): void {
 	const set: Record<string, unknown> = {};
 	if (patch.location) set.location = patch.location;
 	if (patch.unit) set.unit = patch.unit;
+	if (patch.quantity !== undefined && Number.isFinite(patch.quantity) && patch.quantity >= 0) {
+		set.quantity = patch.quantity;
+	}
 	if (patch.bestBefore !== undefined) {
 		set.bestBefore = patch.bestBefore;
 		// Ein von Hand eingetragenes Datum ist keine Schätzung mehr und wird
@@ -247,15 +250,36 @@ function shelfLifeFor(db: Db, productId: number): number {
 	return row?.own ?? row?.fallback ?? 30;
 }
 
+/**
+ * Menge und Einheit des zuletzt eingelagerten Postens dieses Produkts.
+ *
+ * Das ist der bessere Standardwert als eine feste Eins: wer Gouda immer als
+ * 400 g kauft, bekommt beim nächsten Mal 400 g vorgeschlagen — ohne dass
+ * irgendwo etwas einzustellen wäre. Die App lernt es aus dem Verhalten.
+ */
+export function lastPurchase(db: Db, productId: number): { quantity: number; unit: Unit } | null {
+	const row = db
+		.select({ quantity: stockItem.quantity, unit: stockItem.unit })
+		.from(stockItem)
+		.where(eq(stockItem.productId, productId))
+		.orderBy(desc(stockItem.id))
+		.get();
+	return row ?? null;
+}
+
 /** Legt einen Bestandsposten an und schätzt sein MHD aus der Kategorie. */
 export function addStock(
 	db: Db,
-	input: { productId: number; quantity: number; location: Location; unit?: Unit }
+	input: { productId: number; quantity?: number; location: Location; unit?: Unit }
 ): number {
 	const purchasedAt = new Date();
 	const days = shelfLifeFor(db, input.productId);
+	const last = lastPurchase(db, input.productId);
+
+	const quantity = input.quantity ?? last?.quantity ?? 1;
 	const unit =
 		input.unit ??
+		last?.unit ??
 		db.select({ u: product.defaultUnit }).from(product).where(eq(product.id, input.productId)).get()
 			?.u ??
 		'piece';
@@ -264,7 +288,7 @@ export function addStock(
 		.insert(stockItem)
 		.values({
 			productId: input.productId,
-			quantity: input.quantity,
+			quantity,
 			unit,
 			location: input.location,
 			purchasedAt,

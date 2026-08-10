@@ -10,6 +10,7 @@ import {
 	countByLocation,
 	findOrCreateProduct,
 	frequentProducts,
+	lastPurchase,
 	listStock,
 	openOne,
 	undoConsume
@@ -242,5 +243,37 @@ describe('Geöffnet-Haltbarkeit der Kategorien', () => {
 		// Und dort NULL, wo es keinen macht.
 		expect(byName.get('Tiefkühl')).toBeNull();
 		expect(byName.get('Trockenvorrat')).toBeNull();
+	});
+});
+
+describe('Standardmenge aus dem letzten Kauf', () => {
+	it('übernimmt Menge und Einheit des letzten Postens', () => {
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		addStock(db, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
+
+		// Ohne Angabe: die App weiß aus dem Verhalten, dass Gouda 400 g sind.
+		const id = addStock(db, { productId: cheese.id, location: 'fridge' });
+		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+
+		expect(row.quantity).toBe(400);
+		expect(row.unit).toBe('g');
+	});
+
+	it('fällt ohne Kaufhistorie auf eine Einheit zurück', () => {
+		const id = findOrCreateProduct(db, 'Nie gekauft');
+		expect(lastPurchase(db, id)).toBeNull();
+
+		const stockId = addStock(db, { productId: id, location: 'pantry' });
+		const row = db.select().from(stockItem).where(eq(stockItem.id, stockId)).get()!;
+		expect(row.quantity).toBe(1);
+	});
+
+	it('eine ausdrückliche Angabe schlägt den Verlauf', () => {
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		addStock(db, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
+
+		const id = addStock(db, { productId: cheese.id, quantity: 150, unit: 'g', location: 'fridge' });
+		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
+		expect(row.quantity).toBe(150);
 	});
 });

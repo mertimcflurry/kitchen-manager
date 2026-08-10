@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { StockRow } from '$lib/server/db/queries';
-	import { FILL_LABELS, FILL_LEVELS, LOCATIONS, LOCATION_LABELS, isCountable } from '$lib/domain';
+	import {
+		FILL_LABELS,
+		FILL_LEVELS,
+		INPUT_UNITS,
+		INPUT_UNIT_LABELS,
+		LOCATIONS,
+		LOCATION_LABELS,
+		isCountable,
+		toInputUnit
+	} from '$lib/domain';
 	import FillBar from './FillBar.svelte';
 
 	type Props = { item: StockRow; onClose: () => void; onConsume: (item: StockRow) => void };
@@ -10,6 +19,20 @@
 	const isOpen = $derived(item.fillLevel !== null);
 	/** Mehrere verschlossene Einheiten: eine davon wird abgeteilt, nicht alle markiert. */
 	const splitsOnOpen = $derived(isCountable(item.unit) && item.quantity > 1);
+
+	/** Anzeige in der natürlichen Einheit: 1500 g erscheinen als 1,5 kg. */
+	const amount = $derived(toInputUnit(item.quantity, item.unit));
+
+	/**
+	 * Jede Änderung sichert sich selbst.
+	 *
+	 * Ein „Sichern"-Knopf kostet bei jeder Korrektur einen zusätzlichen Tap und
+	 * lässt einen im Zweifel stehen, ob die Änderung angekommen ist. `change`
+	 * statt `input`: erst beim Verlassen des Feldes, nicht bei jedem Zeichen.
+	 */
+	function saveOnChange(event: Event) {
+		(event.currentTarget as HTMLElement).closest('form')?.requestSubmit();
+	}
 
 	/** <input type="date"> erwartet YYYY-MM-DD in Ortszeit, nicht in UTC. */
 	function toDateInput(date: Date | null): string {
@@ -106,6 +129,38 @@
 	</section>
 
 	<section class="mb-6">
+		<h3 class="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">Menge</h3>
+		<form method="POST" action="?/update" use:enhance class="flex gap-2">
+			<input type="hidden" name="id" value={item.id} />
+			<input
+				type="text"
+				inputmode="decimal"
+				name="quantity"
+				value={amount.quantity}
+				onchange={saveOnChange}
+				aria-label="Menge"
+				class="min-h-12 flex-1 rounded-xl border-zinc-300 bg-white text-sm tabular-nums
+					dark:border-zinc-700 dark:bg-zinc-800"
+			/>
+			<select
+				name="unit"
+				value={amount.unit}
+				onchange={saveOnChange}
+				aria-label="Einheit"
+				class="min-h-12 rounded-xl border-zinc-300 bg-white text-sm dark:border-zinc-700
+					dark:bg-zinc-800"
+			>
+				{#each INPUT_UNITS as u (u)}
+					<option value={u}>{INPUT_UNIT_LABELS[u]}</option>
+				{/each}
+			</select>
+		</form>
+		<p class="mt-2 text-xs text-zinc-400">
+			kg und l werden intern in g und ml abgelegt, damit Mengen vergleichbar bleiben.
+		</p>
+	</section>
+
+	<section class="mb-6">
 		<h3 class="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">Ort</h3>
 		<form method="POST" action="?/update" use:enhance class="flex gap-2">
 			<input type="hidden" name="id" value={item.id} />
@@ -134,21 +189,16 @@
 		</h3>
 		<!-- Hier ist eine Tastatur richtig: man tippt ein Datum vom Aufdruck ab,
 		     im Sitzen, selten. Die Regel gilt dem Kühlschrank-Ablauf. -->
-		<form method="POST" action="?/update" use:enhance class="flex gap-2">
+		<form method="POST" action="?/update" use:enhance>
 			<input type="hidden" name="id" value={item.id} />
 			<input
 				type="date"
 				name="bestBefore"
 				value={toDateInput(item.bestBefore)}
-				class="min-h-12 flex-1 rounded-xl border-zinc-300 bg-white text-sm dark:border-zinc-700 dark:bg-zinc-800"
+				onchange={saveOnChange}
+				class="min-h-12 w-full rounded-xl border-zinc-300 bg-white text-sm dark:border-zinc-700
+					dark:bg-zinc-800"
 			/>
-			<button
-				type="submit"
-				class="min-h-12 rounded-xl bg-zinc-900 px-5 text-sm font-medium text-white transition
-					active:scale-95 dark:bg-zinc-100 dark:text-zinc-900"
-			>
-				Sichern
-			</button>
 		</form>
 	</section>
 
@@ -169,7 +219,7 @@
 			class="min-h-12 rounded-xl border border-zinc-300 px-6 text-sm transition active:scale-95
 				dark:border-zinc-700"
 		>
-			Fertig
+			Schließen
 		</button>
 	</div>
 </div>

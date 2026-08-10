@@ -4,12 +4,30 @@
 	import { resolve } from '$app/paths';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Snackbar from '$lib/components/Snackbar.svelte';
-	import { LOCATIONS, LOCATION_LABELS, type Location } from '$lib/domain';
+	import {
+		INPUT_UNITS,
+		INPUT_UNIT_LABELS,
+		LOCATIONS,
+		LOCATION_LABELS,
+		type InputUnit,
+		type Location
+	} from '$lib/domain';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	let location = $state<Location>('fridge');
+
+	/**
+	 * Menge bleibt leer, solange nichts anderes gesagt wird.
+	 *
+	 * Leer heißt „wie beim letzten Mal" — die App kennt aus dem letzten Kauf,
+	 * dass Gouda 400 g sind. Nur wer davon abweicht, tippt etwas ein; der
+	 * schnelle Weg über die Chips bleibt ein einziger Tap.
+	 */
+	let amount = $state('');
+	let amountUnit = $state<InputUnit>('piece');
+	let showAmount = $state(false);
 	let search = $state('');
 	let toast = $state('');
 	let busy = $state(false);
@@ -28,10 +46,19 @@
 		try {
 			const body = new FormData();
 			for (const [key, value] of Object.entries(fields)) body.append(key, value);
+			// Nur mitschicken, wenn ausdrücklich etwas eingetragen wurde.
+			if (showAmount && amount.trim() !== '') {
+				body.append('quantity', amount.trim());
+				body.append('unit', amountUnit);
+			}
+
 			const response = await fetch(`?/${action}`, { method: 'POST', body });
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				toast = `${fields.name} eingelagert`;
+				// Die Rückmeldung nennt die tatsächliche Menge — bei leerem Feld
+				// sieht man so, worauf der letzte Kauf hinauslief.
+				const added = result.data?.amount ? `${result.data.amount} ` : '';
+				toast = `${added}${fields.name} eingelagert`;
 				search = '';
 				await invalidateAll();
 			}
@@ -41,9 +68,9 @@
 	}
 
 	const addKnown = (id: number, name: string) =>
-		post('add', { productId: String(id), name, location, quantity: '1' });
+		post('add', { productId: String(id), name, location });
 
-	const createNew = () => post('create', { name: search.trim(), location, quantity: '1' });
+	const createNew = () => post('create', { name: search.trim(), location });
 </script>
 
 <PageHeader title="Hinzufügen" subtitle="Ein Tap pro Artikel" />
@@ -67,6 +94,48 @@
 			</button>
 		{/each}
 	</div>
+</section>
+
+<section class="mb-5">
+	<div class="mb-2 flex items-center justify-between">
+		<h2 class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Menge</h2>
+		<button
+			type="button"
+			onclick={() => (showAmount = !showAmount)}
+			aria-expanded={showAmount}
+			class="text-xs text-zinc-500 underline dark:text-zinc-400"
+		>
+			{showAmount ? 'wie beim letzten Mal' : 'Menge angeben'}
+		</button>
+	</div>
+	{#if showAmount}
+		<div class="flex gap-2">
+			<input
+				type="text"
+				inputmode="decimal"
+				bind:value={amount}
+				placeholder="z. B. 400"
+				aria-label="Menge"
+				class="min-h-12 flex-1 rounded-xl border-zinc-300 bg-white text-sm tabular-nums
+					dark:border-zinc-700 dark:bg-zinc-800"
+			/>
+			<select
+				bind:value={amountUnit}
+				aria-label="Einheit"
+				class="min-h-12 rounded-xl border-zinc-300 bg-white text-sm dark:border-zinc-700
+					dark:bg-zinc-800"
+			>
+				{#each INPUT_UNITS as u (u)}
+					<option value={u}>{INPUT_UNIT_LABELS[u]}</option>
+				{/each}
+			</select>
+		</div>
+		<p class="mt-2 text-xs text-zinc-400">Gilt für alles, was du danach antippst.</p>
+	{:else}
+		<p class="text-xs text-zinc-400">
+			Übernimmt Menge und Einheit vom letzten Kauf dieses Produkts.
+		</p>
+	{/if}
 </section>
 
 <section class="mb-5">

@@ -52,7 +52,7 @@ export function freshness(bestBefore: Date, now: Date = new Date()): Freshness {
 export function formatDaysUntil(target: Date, now: Date = new Date()): string {
 	const days = daysUntil(target, now);
 
-	if (days < -1) return `${Math.abs(days)} Tage über`;
+	if (days < -1) return `${Math.abs(days)} Tage abgelaufen`;
 	if (days === -1) return 'gestern abgelaufen';
 	if (days === 0) return 'heute';
 	if (days === 1) return 'morgen';

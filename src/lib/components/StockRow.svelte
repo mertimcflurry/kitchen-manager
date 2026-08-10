@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatDaysUntil, freshness, type Freshness } from '$lib/date';
-	import { UNIT_LABELS, isCountable } from '$lib/domain';
+	import { formatQuantity, isCountable } from '$lib/domain';
 	import type { StockRow } from '$lib/server/db/queries';
 	import FillBar from './FillBar.svelte';
 
@@ -120,16 +120,16 @@
 			</p>
 			<p class="flex items-center gap-2 text-sm">
 				<span class="text-zinc-500 tabular-nums dark:text-zinc-400">
-					{item.quantity}
-					{UNIT_LABELS[item.unit]}
+					{formatQuantity(item.quantity, item.unit)}
 				</span>
 				{#if item.fillLevel !== null}
 					<FillBar level={item.fillLevel} />
 				{/if}
 				{#if item.bestBefore && stage}
-					<span class={textClass[stage]}>
-						{formatDaysUntil(item.bestBefore)}{item.bestBeforeIsEstimated ? '?' : ''}
-					</span>
+					<!-- Kein Marker für Schätzungen: fast jedes Datum ist geschätzt, das
+					     Zeichen stünde also in fast jeder Zeile und sagte nichts. Ob ein
+					     Datum abgetippt oder geraten ist, steht im Detail-Sheet. -->
+					<span class={textClass[stage]}>{formatDaysUntil(item.bestBefore)}</span>
 				{/if}
 			</p>
 		</button>

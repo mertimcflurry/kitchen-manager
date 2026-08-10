@@ -1,6 +1,9 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { LOCATIONS, type Location } from '$lib/domain';
+import { stockItem } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { formatQuantity } from '$lib/domain';
+import { INPUT_UNITS, LOCATIONS, toBaseUnit, type InputUnit, type Location } from '$lib/domain';
 import {
 	addStock,
 	findOrCreateProduct,
@@ -11,6 +14,29 @@ import type { Actions, PageServerLoad } from './$types';
 
 function parseLocation(value: FormDataEntryValue | null): Location {
 	return LOCATIONS.includes(value as Location) ? (value as Location) : 'fridge';
+}
+
+/** Menge und Einheit aus dem Formular, auf die Basiseinheit gebracht. */
+function parseAmount(data: FormData): { quantity?: number; unit?: 'piece' | 'pack' | 'g' | 'ml' } {
+	const rawQuantity = data.get('quantity');
+	const rawUnit = data.get('unit');
+	if (typeof rawQuantity !== 'string' || rawQuantity === '') return {};
+	if (!INPUT_UNITS.includes(rawUnit as InputUnit)) return {};
+
+	const parsed = Number(rawQuantity.replace(',', '.'));
+	if (!Number.isFinite(parsed) || parsed <= 0) return {};
+	return toBaseUnit(parsed, rawUnit as InputUnit);
+}
+
+/**
+ * Was tatsächlich eingelagert wurde, in Worten.
+ *
+ * Ohne Mengenangabe entscheidet der letzte Kauf — dann soll die Rückmeldung
+ * zeigen, worauf das hinauslief, statt es raten zu lassen.
+ */
+function describe(id: number): string {
+	const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
+	return row ? formatQuantity(row.quantity, row.unit) : '';
 }
 
 export const load: PageServerLoad = () => {
@@ -31,9 +57,13 @@ export const actions: Actions = {
 		const productId = Number(data.get('productId'));
 		if (!Number.isInteger(productId) || productId <= 0) return fail(400, { message: 'Ungültig' });
 
-		const quantity = Number(data.get('quantity')) || 1;
-		addStock(db, { productId, quantity, location: parseLocation(data.get('location')) });
-		return { ok: true, added: String(data.get('name') ?? '') };
+		// Ohne Angabe entscheidet der letzte Kauf dieses Produkts.
+		const id = addStock(db, {
+			productId,
+			location: parseLocation(data.get('location')),
+			...parseAmount(data)
+		});
+		return { ok: true, added: String(data.get('name') ?? ''), amount: describe(id) };
 	},
 
 	/** Neues Produkt anlegen und gleich einlagern. */
@@ -46,8 +76,8 @@ export const actions: Actions = {
 		const productId = findOrCreateProduct(db, name);
 		addStock(db, {
 			productId,
-			quantity: Number(data.get('quantity')) || 1,
-			location: parseLocation(data.get('location'))
+			location: parseLocation(data.get('location')),
+			...parseAmount(data)
 		});
 		return { ok: true, added: name };
 	}

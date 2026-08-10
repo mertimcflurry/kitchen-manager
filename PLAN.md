@@ -194,6 +194,8 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [x] Schnell hinzufügen: Häufigkeits-Chips, Sofortsuche, Neuanlage
 - [x] Artikel-Detail als Bottom-Sheet: Öffnen/Füllstand, Ort, MHD, Aufgebraucht
 - [x] Öffnen teilt eine Einheit ab und verkürzt deren MHD
+- [x] Menge und Einheit änderbar, Eingabe in kg und l möglich
+- [x] Formulare sichern bei Änderung selbst, kein „Sichern"-Knopf
 - [ ] **Am Handy vor dem Kühlschrank testen, bevor es weitergeht**
 
 ### M4 — MHD
@@ -260,6 +262,31 @@ Angenommene Defaults, bis widersprochen wird:
       liegt außerhalb dieses Repos).
 - [ ] **Preise vom Bon** — werden gespeichert, aber vorerst nicht ausgewertet.
       Preisverlauf je Produkt wäre reizvoll, ist aber Scope-Creep.
+
+## 4b. Offene Fragen aus dem Gebrauch
+
+Aufgefallen beim Benutzen, bewusst nicht sofort gelöst. Erst entscheiden, wenn
+klar ist, ob es im Alltag stört.
+
+- [ ] **Lose Ware: Menge und Füllstand widersprechen sich.** Beim Gouda steht
+      „200 g" neben „50 %" — die 200 g sind das Kaufgewicht, nicht der Rest.
+      Möglich wäre, daraus „ca. 100 g" abzuleiten. Frage dahinter: ist bei loser
+      Ware die Menge oder der Füllstand die führende Angabe?
+- [ ] **Nachkauf erzeugt eine zweite Zeile.** Vier neue Hafermilch neben den
+      alten sind zwei Posten mit verschiedenen Daten — richtig, aber die Liste
+      wird länger. Alternative: eine gruppierte Zeile je Produkt mit
+      aufklappbaren Chargen.
+- [ ] **Packungsgröße fehlt.** Wir zählen vier Packungen, wissen aber nicht,
+      dass jede ein Liter ist. Für M8 („was koche ich") ist der Unterschied
+      zwischen drei Litern und drei Bechern relevant. Wäre ein Feld am Produkt —
+      erst bauen, wenn der Rezeptvorschlag zeigt, dass es fehlt.
+- [ ] **Standardmenge lernt aus dem letzten Kauf.** Kein eingestellter Wert,
+      sondern der zuletzt verwendete. Offen: reicht das, oder braucht es doch
+      eine feste Vorgabe je Produkt, die man einmal setzt?
+- [ ] **Marker für geschätzte MHDs entfernt.** Das `?` stand in fast jeder
+      Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
+      im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
+      klareres Zeichen, nicht als Fragezeichen.
 
 ## 5. Bewusst weggelassen
 

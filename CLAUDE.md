@@ -110,6 +110,18 @@ abgeteilt: „Öffnen" nimmt eine Einheit heraus und legt sie als eigenen Posten
 an, mit eigenem, kürzerem MHD. Eine Zeile ist deshalb entweder komplett
 verschlossen oder ein einzelnes geöffnetes Stück — nie beides gemischt.
 
+**Mengen liegen in Basiseinheiten.** Gespeichert wird `g` und `ml`, eingegeben
+und angezeigt darf `kg` und `l` werden (`toBaseUnit` / `formatQuantity` in
+`domain.ts`). Sonst wäre „1 kg" nicht mit „500 g" vergleichbar und jede Abfrage
+müsste umrechnen. Die Standardmenge beim Hinzufügen kommt aus dem **letzten
+Kauf** desselben Produkts — die App lernt sie aus dem Verhalten, statt sie
+irgendwo einstellen zu lassen.
+
+**Keine „Sichern"-Knöpfe.** Formulare speichern bei `change` selbst. Ein
+Sichern-Knopf kostet bei jeder Korrektur einen Tap und lässt einen im Zweifel,
+ob die Änderung angekommen ist. `change` statt `input`: erst beim Verlassen des
+Feldes, nicht bei jedem Zeichen.
+
 **Kein Auth.** Die App hängt hinter Tailscale. Keine Login-Maske, keine
 Sessions, keine Nutzer-Tabelle.
 

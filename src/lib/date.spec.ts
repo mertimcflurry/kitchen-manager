@@ -83,6 +83,6 @@ describe('formatDaysUntil', () => {
 
 	it('sagt beim Abgelaufenen, wie lange schon', () => {
 		expect(formatDaysUntil(inDays(-1), now)).toBe('gestern abgelaufen');
-		expect(formatDaysUntil(inDays(-5), now)).toBe('5 Tage über');
+		expect(formatDaysUntil(inDays(-5), now)).toBe('5 Tage abgelaufen');
 	});
 });

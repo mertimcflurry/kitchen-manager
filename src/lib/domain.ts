@@ -51,3 +51,49 @@ export const FILL_LABELS: Record<FillLevel, string> = {
 export function isCountable(unit: Unit): boolean {
 	return unit === 'piece' || unit === 'pack';
 }
+
+/* ---------- Eingabe und Anzeige von Mengen ---------- */
+
+/**
+ * Einheiten zur Eingabe, inklusive der großen Varianten.
+ *
+ * Gespeichert wird immer in der Basis (g, ml) — sonst müsste jede Abfrage
+ * umrechnen und „1 kg" wäre nicht mit „500 g" vergleichbar. Eingegeben und
+ * angezeigt wird, was sich natürlich liest.
+ */
+export const INPUT_UNITS = ['piece', 'pack', 'g', 'kg', 'ml', 'l'] as const;
+export type InputUnit = (typeof INPUT_UNITS)[number];
+
+export const INPUT_UNIT_LABELS: Record<InputUnit, string> = {
+	piece: 'Stück',
+	pack: 'Pck',
+	g: 'g',
+	kg: 'kg',
+	ml: 'ml',
+	l: 'l'
+};
+
+/** Rechnet eine Eingabe auf die Basiseinheit um. */
+export function toBaseUnit(quantity: number, unit: InputUnit): { quantity: number; unit: Unit } {
+	if (unit === 'kg') return { quantity: quantity * 1000, unit: 'g' };
+	if (unit === 'l') return { quantity: quantity * 1000, unit: 'ml' };
+	return { quantity, unit };
+}
+
+/** Die Eingabeeinheit, in der ein gespeicherter Wert am besten aussieht. */
+export function toInputUnit(quantity: number, unit: Unit): { quantity: number; unit: InputUnit } {
+	if (unit === 'g' && quantity >= 1000) return { quantity: quantity / 1000, unit: 'kg' };
+	if (unit === 'ml' && quantity >= 1000) return { quantity: quantity / 1000, unit: 'l' };
+	return { quantity, unit };
+}
+
+const NUMBER = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
+
+/**
+ * Menge, wie ein Mensch sie sagen würde: 1500 g werden zu „1,5 kg".
+ * Deutsches Dezimalkomma, keine Nachkommastellen bei glatten Zahlen.
+ */
+export function formatQuantity(quantity: number, unit: Unit): string {
+	const display = toInputUnit(quantity, unit);
+	return `${NUMBER.format(display.quantity)} ${INPUT_UNIT_LABELS[display.unit]}`;
+}
