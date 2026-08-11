@@ -167,6 +167,16 @@ export const receiptLine = sqliteTable(
 		/** Wortlaut vom Bon: „BIO-TOFU NAT 400G". Bleibt unverändert stehen. */
 		rawText: text('raw_text').notNull(),
 		parsedName: text('parsed_name'),
+		/**
+		 * Kategorievorschlag des Modells, als Name.
+		 *
+		 * Nicht als Fremdschlüssel: der Vorschlag ist eine Behauptung über eine
+		 * ungeprüfte Zeile, keine Zuordnung. Erst beim Bestätigen wird daraus ein
+		 * Produkt in einer echten Kategorie. Ohne dieses Feld landete alles vom
+		 * Bon in „Sonstiges" — mit dessen 30-Tage-Schätzung wäre die Ablaufliste
+		 * nach dem ersten Einkauf wertlos.
+		 */
+		parsedCategory: text('parsed_category'),
 		quantity: real('quantity'),
 		unit: text('unit', { enum: UNITS }),
 		priceCents: integer('price_cents'),

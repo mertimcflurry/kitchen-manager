@@ -34,3 +34,12 @@ export function createDb(url: string) {
 }
 
 export type Db = ReturnType<typeof createDb>;
+
+/**
+ * Datenbank **oder** laufende Transaktion.
+ *
+ * Drizzle gibt einer Transaktion einen eigenen Typ ohne `$client`. Wer beides
+ * annimmt, lässt sich aus einer Transaktion heraus aufrufen — nötig für den
+ * Bon-Import, der Produkt, Bestand und Alias in einem Rutsch schreibt.
+ */
+export type DbOrTx = Db | Parameters<Parameters<Db['transaction']>[0]>[0];

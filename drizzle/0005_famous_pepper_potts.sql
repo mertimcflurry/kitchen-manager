@@ -1,0 +1,1 @@
+ALTER TABLE `receipt_line` ADD `parsed_category` text;

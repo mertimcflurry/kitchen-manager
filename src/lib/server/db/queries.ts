@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import { daysUntil, estimateBestBefore, FRESHNESS_THRESHOLDS } from '../../date';
 import { isCountable } from '../../domain';
-import type { Db } from './client';
+import type { Db, DbOrTx } from './client';
 import { category, product, stockItem, type FillLevel, type Location, type Unit } from './schema';
 
 /** Eine Zeile der Bestandsliste, fertig für die Anzeige. */
@@ -268,7 +268,7 @@ export function searchProducts(db: Db, term: string, limit = 20) {
 }
 
 /** Haltbarkeit des Produkts, sonst die seiner Kategorie. */
-function shelfLifeFor(db: Db, productId: number): number {
+function shelfLifeFor(db: DbOrTx, productId: number): number {
 	const row = db
 		.select({ own: product.shelfLifeDays, fallback: category.defaultShelfLifeDays })
 		.from(product)
@@ -285,7 +285,10 @@ function shelfLifeFor(db: Db, productId: number): number {
  * 400 g kauft, bekommt beim nächsten Mal 400 g vorgeschlagen — ohne dass
  * irgendwo etwas einzustellen wäre. Die App lernt es aus dem Verhalten.
  */
-export function lastPurchase(db: Db, productId: number): { quantity: number; unit: Unit } | null {
+export function lastPurchase(
+	db: DbOrTx,
+	productId: number
+): { quantity: number; unit: Unit } | null {
 	const row = db
 		.select({ quantity: stockItem.quantity, unit: stockItem.unit })
 		.from(stockItem)
@@ -297,8 +300,15 @@ export function lastPurchase(db: Db, productId: number): { quantity: number; uni
 
 /** Legt einen Bestandsposten an und schätzt sein MHD aus der Kategorie. */
 export function addStock(
-	db: Db,
-	input: { productId: number; quantity?: number; location: Location; unit?: Unit }
+	db: DbOrTx,
+	input: {
+		productId: number;
+		quantity?: number;
+		location: Location;
+		unit?: Unit;
+		/** Gesetzt, wenn der Posten aus einem Bon stammt — Herkunft bleibt nachvollziehbar. */
+		receiptId?: number;
+	}
 ): number {
 	const purchasedAt = new Date();
 	const days = shelfLifeFor(db, input.productId);
@@ -321,7 +331,8 @@ export function addStock(
 			location: input.location,
 			purchasedAt,
 			bestBefore: estimateBestBefore(purchasedAt, days),
-			bestBeforeIsEstimated: true
+			bestBeforeIsEstimated: true,
+			receiptId: input.receiptId
 		})
 		.returning({ id: stockItem.id })
 		.get().id;
@@ -384,9 +395,13 @@ export function updateCategory(
 
 /**
  * Findet ein Produkt über seinen Namen oder legt es an.
- * Neue Produkte landen in „Sonstiges", bis sie jemand einsortiert.
+ *
+ * `categoryName` ist ein Vorschlag — vom Bon-Modell etwa. Passt er auf keine
+ * vorhandene Kategorie, landet das Produkt in „Sonstiges", bis jemand es
+ * einsortiert. Ein bereits vorhandenes Produkt wird **nicht** umsortiert:
+ * eine von Hand gesetzte Kategorie wiegt schwerer als ein Vorschlag.
  */
-export function findOrCreateProduct(db: Db, name: string): number {
+export function findOrCreateProduct(db: DbOrTx, name: string, categoryName?: string): number {
 	const trimmed = name.trim();
 	const existing = db
 		.select({ id: product.id })
@@ -395,14 +410,18 @@ export function findOrCreateProduct(db: Db, name: string): number {
 		.get();
 	if (existing) return existing.id;
 
-	const fallback =
+	const suggested = categoryName
+		? db.select().from(category).where(eq(category.name, categoryName)).get()
+		: undefined;
+	const target =
+		suggested ??
 		db.select().from(category).where(eq(category.name, 'Sonstiges')).get() ??
 		db.select().from(category).orderBy(asc(category.sortOrder)).get();
-	if (!fallback) throw new Error('Keine Kategorie vorhanden — erst npm run db:seed ausführen');
+	if (!target) throw new Error('Keine Kategorie vorhanden — erst npm run db:seed ausführen');
 
 	return db
 		.insert(product)
-		.values({ name: trimmed, categoryId: fallback.id })
+		.values({ name: trimmed, categoryId: target.id })
 		.returning({ id: product.id })
 		.get().id;
 }

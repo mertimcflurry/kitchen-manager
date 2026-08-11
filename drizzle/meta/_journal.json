@@ -36,6 +36,13 @@
       "when": 1786401137273,
       "tag": "0004_backfill_opened_shelf_life",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786490578402,
+      "tag": "0005_famous_pepper_potts",
+      "breakpoints": true
     }
   ]
 }
