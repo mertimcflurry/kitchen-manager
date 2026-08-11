@@ -69,8 +69,9 @@ hier ein Korrektheitskriterium.
    Laufzeitwerte aus `$lib/server/` in Komponenten importieren.
 7. **Prüf deine Arbeit** mit `npm run check`, `npm run lint` und
    `npm run build`. Der Build ist der eigentliche Wächter: er bricht
-   Server-Importe in Browser-Code ab, der Dev-Server lässt sie durch. Ein
-   Dev-Server läuft üblicherweise schon auf Port 5173 — starte keinen zweiten.
+   Server-Importe in Browser-Code ab, der Dev-Server lässt sie durch. Läuft
+   schon ein Dev-Server auf Port 5173, starte keinen zweiten — `strictPort`
+   ist gesetzt, der zweite scheitert ohnehin.
 
 ## Sag es, wenn es umständlich ist
 

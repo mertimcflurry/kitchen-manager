@@ -64,7 +64,7 @@ Für jeden Screen mitdenken, auch wenn niemand danach fragt:
 
 `npm run check`, `npm run lint`, `npm run build`. Der Build gehört dazu, nicht
 nur `check` — nur er bricht versehentliche Server-Importe im Browser-Code ab.
-Ein Dev-Server läuft üblicherweise schon auf Port 5173, starte keinen zweiten.
+Läuft schon ein Dev-Server auf Port 5173, starte keinen zweiten (`strictPort`).
 A11y-Warnungen von `svelte-check` werden behoben, nicht unterdrückt.
 
 ## Rückmeldung

@@ -202,8 +202,10 @@ docker compose down
 - **Alias-Tabelle vor dem Modell fragen.** Bekannte Bon-Bezeichnungen
   (`BIO-TOFU NAT 400G` → Tofu natur) werden lokal aufgelöst. Nur unbekannte
   Zeilen kosten Tokens.
-- Bei Arbeit an KI-Code die `claude-api`-Skill laden, statt Modell-IDs,
-  Preise oder SDK-Signaturen aus dem Gedächtnis zu schreiben.
+- Modell-IDs, Preise und SDK-Signaturen nie aus dem Gedächtnis schreiben.
+  Dafür die `claude-api`-Skill laden — sie ist auf diesem Rechner derzeit
+  **nicht installiert** (Stand 2026-08-11), also ersatzweise auf
+  `docs.claude.com` nachschlagen.
 
 ## Subagenten
 

@@ -78,8 +78,10 @@ Der wichtigste Teil deiner Rolle: **nichts geht ungeprüft in die Datenbank.**
 - **`.env.example` ist nicht gitignoriert und enthält nur leere Platzhalter.**
   Das ist hier schon einmal beinahe schiefgegangen — trag dort niemals einen
   echten Wert ein.
-- Bei Arbeit an KI-Code die `claude-api`-Skill laden, statt Modell-IDs, Preise
-  oder SDK-Signaturen aus dem Gedächtnis zu schreiben.
+- **Schreib Modell-IDs, Preise und SDK-Signaturen nie aus dem Gedächtnis.** Lade
+  dafür die `claude-api`-Skill; ist sie nicht installiert, schlag auf
+  `docs.claude.com` nach. Geraten wird hier nicht — eine falsche Modell-ID
+  fällt erst zur Laufzeit auf, ein veraltetes Preisargument nie.
 
 ## Fehlerfälle, die real vorkommen
 

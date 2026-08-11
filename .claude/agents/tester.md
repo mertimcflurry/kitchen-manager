@@ -67,10 +67,10 @@ Balken ohne Aussage ist schlimmer als ein roter. Der Ablauf:
 
 ## Am laufenden Server prüfen
 
-Ein Dev-Server läuft üblicherweise schon auf Port 5173. **Prüf das erst**
+**Prüf erst, ob schon einer läuft**
 (`curl -sS -o /dev/null -w '%{http_code}' http://localhost:5173/`), bevor du
-einen startest — `strictPort` ist gesetzt, ein zweiter Start scheitert.
-Startest du doch einen, dann im Hintergrund und beende ihn danach wieder.
+einen startest — `strictPort` ist gesetzt, ein zweiter Start scheitert. Wenn
+keiner läuft, starte ihn im Hintergrund und beende ihn danach wieder.
 
 Zur vollständigen Prüfung gehören `npm test`, `npm run check`, `npm run lint`
 und `npm run build`. Der Build ist nicht optional: nur er bricht Server-Importe
