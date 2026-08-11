@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import ItemSheet from '$lib/components/ItemSheet.svelte';
 	import LocationTabs from '$lib/components/LocationTabs.svelte';
@@ -32,6 +33,16 @@
 	);
 	let undoState = $state<{ id: number; quantity: number; fillLevel: number | null } | null>(null);
 	let undoLabel = $state('');
+
+	/**
+	 * Rückmeldung nach dem Bon-Import.
+	 *
+	 * Der Prüf-Screen landet nach „übernehmen" hier — ohne ein Wort dazu müsste
+	 * man die Liste absuchen, um zu glauben, dass es geklappt hat. Die Zahl steht
+	 * in der URL, weil sie einen Seitenwechsel überleben muss.
+	 */
+	const importedCount = $derived(Number(page.url.searchParams.get('eingelagert')) || 0);
+	let importAcknowledged = $state(false);
 
 	async function adjust(item: Row, delta: number) {
 		const next = Math.max(0, item.quantity + delta);
@@ -139,6 +150,14 @@
 
 {#if sheetItem}
 	<ItemSheet item={sheetItem} onClose={() => (sheetId = null)} onConsume={consume} />
+{/if}
+
+{#if importedCount > 0 && !importAcknowledged && !undoState}
+	<Snackbar
+		message="{importedCount} vom Bon eingelagert"
+		onDismiss={() => (importAcknowledged = true)}
+		timeout={3500}
+	/>
 {/if}
 
 {#if undoState}
