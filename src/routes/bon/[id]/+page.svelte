@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { isCountable, LOCATIONS, LOCATION_LABELS, UNIT_LABELS, type Location } from '$lib/domain';
+	import {
+		defaultLocationFor,
+		isCountable,
+		LOCATIONS,
+		LOCATION_LABELS,
+		UNIT_LABELS,
+		type Location
+	} from '$lib/domain';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { PageData } from './$types';
 
@@ -20,7 +27,15 @@
 	 */
 	let lines = $state(
 		untrack(() =>
-			data.receipt.lines.map((line) => ({ ...line, location: 'fridge' as Location, keep: true }))
+			data.receipt.lines.map((line) => ({
+				// Der Ort kommt aus der Kategorie, die das Modell ohnehin schon
+				// gewählt hat: Tiefkühl in die Truhe, Nudeln in den Vorrat. Ohne
+				// das läge ein ganzer Einkauf erst einmal im Kühlschrank und man
+				// tippte die Handvoll Ausnahmen einzeln um.
+				...line,
+				location: defaultLocationFor(line.category),
+				keep: true
+			}))
 		)
 	);
 	let busy = $state(false);

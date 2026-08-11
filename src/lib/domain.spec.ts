@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatQuantity, isCountable, remainingQuantity, toBaseUnit, toInputUnit } from './domain';
+import {
+	defaultLocationFor,
+	formatQuantity,
+	isCountable,
+	remainingQuantity,
+	toBaseUnit,
+	toInputUnit
+} from './domain';
 
 describe('toBaseUnit', () => {
 	it('rechnet kg und l auf die Basiseinheit herunter', () => {
@@ -70,5 +77,20 @@ describe('remainingQuantity', () => {
 		// „0,75 Stück" wäre keine ehrliche Angabe.
 		expect(remainingQuantity(1, 'piece', 75)).toBe(1);
 		expect(remainingQuantity(3, 'pack', 50)).toBe(3);
+	});
+});
+
+describe('defaultLocationFor', () => {
+	it('legt Tiefkühl und Vorrat dorthin, wo sie hingehören', () => {
+		expect(defaultLocationFor('Tiefkühl')).toBe('freezer');
+		expect(defaultLocationFor('Trockenvorrat')).toBe('pantry');
+		expect(defaultLocationFor('Konserven')).toBe('pantry');
+	});
+
+	it('fällt auf den Kühlschrank zurück, wenn die Kategorie nichts sagt', () => {
+		// Auch für Namen, die es in der Tabelle nicht gibt — dann verhält sich
+		// der Prüf-Screen wie vorher.
+		expect(defaultLocationFor('Milchprodukte')).toBe('fridge');
+		expect(defaultLocationFor('Erfundene Kategorie')).toBe('fridge');
 	});
 });

@@ -52,6 +52,37 @@ export function isCountable(unit: Unit): boolean {
 	return unit === 'piece' || unit === 'pack';
 }
 
+/* ---------- Wohin etwas standardmäßig gehört ---------- */
+
+/**
+ * Der Ort, den eine Kategorie fast immer hat.
+ *
+ * Gedacht für den Bon-Prüfschritt: dort ist noch nichts gewählt, und zwanzig
+ * Zeilen pauschal in den Kühlschrank zu legen heißt, Tiefkühlpizza und Nudeln
+ * einzeln umzutippen. Mit der Zuordnung stimmt der Großteil eines Einkaufs
+ * sofort, der Rest bleibt einen Tap entfernt.
+ *
+ * Bewusst eine Konstante im Code und keine Spalte an der Kategorie: eine
+ * Migration plus eine dritte Spalte in den Einstellungen kostete mehr als die
+ * Sache wert ist — falsch liegt die Tabelle nur bei Randfällen (Kartoffeln,
+ * angebrochener Saft), und die korrigiert derselbe eine Tap, den man ohne
+ * Tabelle bei jeder Zeile hätte. Nicht aufgeführte Namen fallen auf
+ * `fridge` zurück, also auf das bisherige Verhalten.
+ */
+const DEFAULT_LOCATION_BY_CATEGORY: Record<string, Location> = {
+	'Brot & Backwaren': 'pantry',
+	Tiefkühl: 'freezer',
+	Konserven: 'pantry',
+	Trockenvorrat: 'pantry',
+	'Gewürze & Saucen': 'pantry',
+	'Süßes & Snacks': 'pantry',
+	Getränke: 'pantry'
+};
+
+export function defaultLocationFor(categoryName: string): Location {
+	return DEFAULT_LOCATION_BY_CATEGORY[categoryName] ?? 'fridge';
+}
+
 /* ---------- Eingabe und Anzeige von Mengen ---------- */
 
 /**
