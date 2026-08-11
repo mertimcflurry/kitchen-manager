@@ -86,6 +86,12 @@ export function receiptSchema(categoryNames: string[]): Record<string, unknown> 
  * was **keine** Warenzeile ist (Pfand, Rabatt, Summe), und dass `unit` die
  * Zähleinheit ist — vier Packungen, nicht 4000 ml. Ohne den zweiten Punkt
  * landet „2 x MILCH 1L" als 2000 ml im Bestand und jede Mengenanzeige lügt.
+ *
+ * Die Ausnahme davon ist am ersten echten Bon aufgefallen: „EIER 10ER" kam
+ * als eine Packung zurück. Formal richtig, im Kühlschrank falsch — man nimmt
+ * ein Ei heraus, nicht einen Karton, und „1 Pck" beantwortet die einzige
+ * Frage nicht, die man vor dem offenen Kühlschrank hat. Gebinde, deren Inhalt
+ * einzeln verbraucht wird, zählen deshalb den Inhalt.
  */
 export const RECEIPT_SYSTEM_PROMPT = `Du liest deutsche Kassenbons und gibst die gekauften Waren als JSON zurück.
 
@@ -107,6 +113,14 @@ Felder:
   Nur lose gewogene Ware bekommt "g" oder "ml" mit dem gewogenen Wert:
   "TOMATEN 0,412 kg" ist quantity 412, unit "g".
   Ohne erkennbare Menge: quantity 1.
+- Gebinde mit einzeln entnehmbarem Inhalt werden nach ihrem Inhalt gezählt,
+  nicht nach der Schachtel. "EIER 10ER" ist quantity 10, unit "piece" — nicht
+  1 Packung. Ebenso "JOGHURT 4X150G" (quantity 4), "BRÖTCHEN 6 STK"
+  (quantity 6), "BIER 6ER" (quantity 6). Faustregel: was man einzeln
+  herausnimmt und einzeln verbraucht, wird gezählt; unit ist dann "piece".
+  Eine Mengenzeile davor multipliziert das: "2 x EIER 10ER" ist quantity 20.
+- Gewicht oder Volumen EINER Packung ist keine Gebindegröße: "MEHL 1KG" ist
+  quantity 1, unit "pack", und "TOFU 400G" ist quantity 1, unit "pack".
 - category: genau einer der vorgegebenen Werte. Im Zweifel "Sonstiges".
 - price_cents: der Zeilenpreis in Cent, 0 wenn unlesbar.
 - confidence: "high", wenn Name und Menge sicher lesbar sind. "low" bei
