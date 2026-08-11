@@ -136,10 +136,10 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
       Füllstand als vier Knöpfe mit Balkenvorschau, nie als Regler.
 - [ ] **Schnell hinzufügen** — Chips der häufigsten Produkte zum Ein-Tap-Nachlegen,
       darunter erst die Suche. Das Meiste ist Nachkauf von immer demselben.
-- [ ] **Bon aufnehmen** — großer Knopf geht direkt in die Kamera
+- [x] **Bon aufnehmen** — großer Knopf geht direkt in die Kamera
       (`capture="environment"`), darunter klein „aus der Galerie" ohne
       `capture`, was iOS die Auswahl zeigen lässt. Mehrere Aufnahmen pro Bon.
-- [ ] **Bon prüfen** — Zeilen als Karten, Unsicheres hervorgehoben,
+- [x] **Bon prüfen** — Zeilen als Karten, Unsicheres hervorgehoben,
       „Alle übernehmen" als Primäraktion, Korrigieren als Ausnahme.
 - [ ] **Bald schlecht** — nach Dringlichkeit, mit „aufgebraucht"-Geste.
 - [ ] **Einkaufsliste** — manuell plus Vorschläge, abhaken mit großem Ziel.
@@ -219,17 +219,35 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### M5 — Bon-Import
 
-- [ ] Kamera direkt, Galerie als zweiter Weg, mehrere Fotos pro Bon
-- [ ] Anthropic Vision mit Structured Outputs, serverseitig
-- [ ] Prüf-Screen mit Korrigieren und Verwerfen
-- [ ] Übernahme ins Inventar in einer Transaktion
-- [ ] Fehlerfälle: unlesbar, Timeout, kein Guthaben
+- [x] Kamera direkt (`capture`), Galerie als zweiter Weg ohne `capture`,
+      bis zu vier Aufnahmen pro Bon. Verkleinert wird im Browser auf die
+      Kantenlänge, die das Modell ohnehin maximal verarbeitet (2576 px) —
+      das Hochladen war sonst der langsamste Teil des ganzen Vorgangs.
+- [x] Anthropic Vision mit Structured Outputs, ausschließlich in
+      `src/lib/server/ai/`. Thinking abgeschaltet: Bonposten abzutippen ist
+      keine Denkaufgabe, siehe aber §4b.
+- [x] **Das Modell wählt auch die Kategorie** — aus den Namen, die es in der
+      Datenbank wirklich gibt. Kostet keinen zusätzlichen Tap und keinen
+      zweiten Aufruf, macht aber den Unterschied zwischen einer brauchbaren
+      MHD-Schätzung und zwanzig Artikeln in „Sonstiges" mit dessen 30 Tagen.
+- [x] Prüf-Screen mit Korrigieren und Verwerfen: Namen editierbar, Menge über
+      +/-, Ort durch Antippen durchgeschaltet, Zeile verwerfen mit einem Tap
+      und rückholbar. Geprüft wird im Browser, bestätigt wird der ganze Bon.
+- [x] Übernahme ins Inventar in einer Transaktion, mit Herkunft am Posten
+- [x] Fehlerfälle: unlesbar, Zeitüberschreitung, kein Guthaben, kein Schlüssel —
+      jeder mit eigenem Satz, weil jeder eine andere Reaktion verlangt.
+      Fehlgeschlagene Bons bleiben samt Rohantwort als `discarded` liegen.
+- [ ] **Am Handy gegenprüfen**: echter Bon bei Küchenlicht, Kamera-Knopf auf
+      iOS, Lesbarkeit der Karten, ob vier Aufnahmen für einen langen Bon reichen
 
 ### M6 — Alias-Lernen
 
-- [ ] Alias beim Bestätigen einer Zeile schreiben
-- [ ] Alias vor dem Modellaufruf abfragen
-- [ ] Anzeigen, wie viel ohne API erkannt wurde
+- [x] Alias beim Bestätigen einer Zeile schreiben (`confirmReceipt`)
+- [x] Alias abfragen, **bevor** die Zeilen gespeichert werden. Nicht vor dem
+      Modellaufruf — das Foto muss so oder so gelesen werden, siehe §4b.
+- [x] Sichtbar machen, was ohne Raten erkannt wurde: bekannte Zeilen tragen
+      im Prüf-Screen „bekannt" und gelten als sicher. Eine Statistik darüber
+      hinaus wäre eine Zahl, die niemand antippt.
 
 ### M7 — Auswertung und Einkaufsliste
 
@@ -262,12 +280,16 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 Angenommene Defaults, bis widersprochen wird:
 
-- [ ] **Anthropic-Key** — wird vom Nutzer selbst in `.env` abgelegt; ich schreibe
-      nur `.env.example`. Modell konfigurierbar, Default `claude-opus-5`,
-      Wechsel auf Haiku möglich, sobald an echten Bons gemessen.
+- [x] **Anthropic-Key** — liegt in `.env`, im Repo steht nur `.env.example`.
+      Modell über `ANTHROPIC_MODEL`, Default `claude-sonnet-5`: Haiku 4.5
+      verarbeitet Bilder nur bis 1568 px und ist für Bonschrift damit nicht
+      billiger, sondern untauglich. Ein synthetischer Bon kostete im Test
+      ~1,5 ct und brauchte 7 Sekunden.
 - [ ] **`tailscale serve`** — erst zu M10, dann verbindlich, weil iOS ohne
       HTTPS keinen Service Worker registriert.
-- [ ] **Bon-Bilder** — 90 Tage aufbewahren, dann automatisch löschen.
+- [ ] **Bon-Bilder** — 90 Tage aufbewahren, dann automatisch löschen. Liegen
+      seit M5 unter `data/receipts/`, also im Bind-Mount neben der Datenbank;
+      der Aufräumjob fehlt noch und gehört zu M9.
 - [ ] **Orte** — feste Liste Kühlschrank/Gefrier/Vorrat, keine freien Orte.
 - [ ] **`~/projects/README.md`** — Vermerk nachtragen, dass dieses Projekt vom
       dokumentierten Python-Standard-Stack abweicht (noch nicht gemacht,
@@ -308,6 +330,35 @@ klar ist, ob es im Alltag stört.
 - [ ] **Standardmenge lernt aus dem letzten Kauf.** Kein eingestellter Wert,
       sondern der zuletzt verwendete. Offen: reicht das, oder braucht es doch
       eine feste Vorgabe je Produkt, die man einmal setzt?
+- [x] **Die Alias-Tabelle spart Prüfaufwand, keine Tokens.** CLAUDE.md sagt
+      „Alias-Tabelle vor dem Modell fragen — nur unbekannte Zeilen kosten
+      Tokens". Beim Bild-Aufruf geht das nicht auf: Welche Zeilen auf dem Bon
+      stehen, weiß man erst, nachdem das Foto gelesen wurde, und gelesen wird
+      es ganz oder gar nicht. Der Alias greift deshalb direkt danach und
+      ersetzt den Namensvorschlag des Modells durch das früher bestätigte
+      Produkt. Der Gewinn ist echt, nur ein anderer: nicht weniger Tokens,
+      sondern weniger Korrigieren im Prüf-Screen — und beim zweiten Einkauf
+      ist „BIO-TOFU NAT 400G" wieder derselbe Artikel und nicht ein zweiter.
+- [ ] **Standardort je Kategorie.** Der Prüf-Screen legt alles erst einmal in
+      den Kühlschrank; Tiefkühlpizza und Nudeln muss man einzeln umtippen.
+      Ein Feld `default_location` an der Kategorie (in den Einstellungen
+      editierbar, wie die Haltbarkeiten) würde das für den Großteil eines
+      Einkaufs erledigen — Tiefkühl → Gefrier, Konserven → Vorrat. Kostet eine
+      Migration und eine Spalte in den Einstellungen. **Bewusst zurückgestellt,
+      bis ein echter Bon zeigt, wie oft man wirklich umtippt** — bei einem
+      Kühlschrank-lastigen Einkauf wären es zwei Taps und die Sache wäre es
+      nicht wert.
+- [ ] **Einkaufsliste aus der Undo-Leiste.** Wer etwas aufbraucht, weiß in
+      genau diesem Moment, dass es fehlt — und genau dann steht die
+      Undo-Leiste schon da. Ein zweiter Knopf „+ Einkaufsliste" daneben kostet
+      keinen Screen, keine Einstellung und keinen Umweg, sondern einen Tap im
+      richtigen Augenblick. Wartet auf M7, weil eine Liste, die man befüllen
+      aber nirgends ansehen kann, schlimmer ist als keine.
+- [ ] **Thinking beim Bon-Aufruf ist aus.** Spart Zeit und Geld, und an einem
+      synthetischen Bon war die Trefferquote makellos. Ob das an echter,
+      schiefer, geknickter Bonschrift hält, zeigt erst der Alltag — falls
+      nicht, ist `thinking: adaptive` in `receipt.ts` der erste Hebel, vor
+      jedem Prompt-Basteln.
 - [ ] **Marker für geschätzte MHDs entfernt.** Das `?` stand in fast jeder
       Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
       im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
