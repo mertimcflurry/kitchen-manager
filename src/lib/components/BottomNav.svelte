@@ -7,6 +7,16 @@
 	type NavRoute = '/' | '/ablauf' | '/einkauf' | '/kochen';
 	type NavItem = { route: NavRoute; label: string; icon: IconName };
 
+	type Props = {
+		/**
+		 * Abgelaufen oder heute/morgen fällig. Steht als Abzeichen an „Ablauf",
+		 * damit der Blick auf die Nav-Leiste schon reicht — ohne dafür extra
+		 * hinzutippen zu müssen, was ja gerade der Zweck des Abzeichens ist.
+		 */
+		urgentCount?: number;
+	};
+	let { urgentCount = 0 }: Props = $props();
+
 	// Zwei Eintraege links, zwei rechts — dazwischen sitzt der Bon-Button.
 	const left: NavItem[] = [
 		{ route: '/', label: 'Bestand', icon: 'stock' },
@@ -16,6 +26,9 @@
 		{ route: '/einkauf', label: 'Einkauf', icon: 'cart' },
 		{ route: '/kochen', label: 'Kochen', icon: 'pot' }
 	];
+
+	// Zweistellig wird auf der Kachel eng — „9+" bleibt lesbar und reicht als Auskunft.
+	const badgeText = $derived(urgentCount > 9 ? '9+' : String(urgentCount));
 
 	function isActive(route: NavRoute): boolean {
 		const path = resolve(route);
@@ -58,6 +71,7 @@
 
 {#snippet navLink(item: NavItem)}
 	{@const active = isActive(item.route)}
+	{@const badge = item.route === '/ablauf' && urgentCount > 0}
 	<a
 		href={resolve(item.route)}
 		aria-current={active ? 'page' : undefined}
@@ -65,8 +79,23 @@
 			font-medium transition-colors active:bg-zinc-100 dark:active:bg-zinc-800
 			{active ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'}"
 	>
-		{@render icon(item.icon)}
-		<span>{item.label}</span>
+		<span class="relative">
+			{@render icon(item.icon)}
+			{#if badge}
+				<span
+					class="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center
+						rounded-full bg-red-600 px-1 text-[0.625rem] font-semibold text-white
+						dark:bg-red-500"
+					aria-hidden="true"
+				>
+					{badgeText}
+				</span>
+			{/if}
+		</span>
+		<span>
+			{item.label}
+			{#if badge}<span class="sr-only">, {badgeText} läuft bald ab</span>{/if}
+		</span>
 	</a>
 {/snippet}
 

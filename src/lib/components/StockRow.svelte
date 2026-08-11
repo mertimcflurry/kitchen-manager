@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatDaysUntil, freshness, type Freshness } from '$lib/date';
-	import { formatQuantity, isCountable } from '$lib/domain';
+	import { formatQuantity, isCountable, LOCATION_LABELS, remainingQuantity } from '$lib/domain';
 	import type { StockRow } from '$lib/server/db/queries';
 	import FillBar from './FillBar.svelte';
 
@@ -9,8 +9,14 @@
 		onAdjust: (item: StockRow, delta: number) => void;
 		onConsume: (item: StockRow) => void;
 		onOpen: (item: StockRow) => void;
+		/**
+		 * Ortsangabe in der Zeile. Im Bestand überflüssig — dort steht der Ort
+		 * schon im aktiven Tab. Auf ortsübergreifenden Listen dagegen die Frage,
+		 * die als nächste kommt: welche Tür mache ich auf?
+		 */
+		showLocation?: boolean;
 	};
-	let { item, onAdjust, onConsume, onOpen }: Props = $props();
+	let { item, onAdjust, onConsume, onOpen, showLocation = false }: Props = $props();
 
 	/** Ab hier gilt die Wischbewegung als „aufgebraucht", nicht als Verrutschen. */
 	const SWIPE_THRESHOLD = 96;
@@ -23,6 +29,10 @@
 
 	const stage: Freshness | null = $derived(item.bestBefore ? freshness(item.bestBefore) : null);
 	const countable = $derived(isCountable(item.unit));
+	// Angebrochene lose Ware zeigt die verrechnete Restmenge, nicht die
+	// gekaufte — sonst stehen „200 g" und „50 %" scheinbar im Widerspruch.
+	const displayQuantity = $derived(remainingQuantity(item.quantity, item.unit, item.fillLevel));
+	const isApproximate = $derived(!countable && item.fillLevel !== null);
 
 	const dotClass: Record<Freshness, string> = {
 		expired: 'bg-red-500',
@@ -118,12 +128,20 @@
 				<span aria-hidden="true">{item.emoji}</span>
 				{item.name}
 			</p>
-			<p class="flex items-center gap-2 text-sm">
+			<p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 				<span class="text-zinc-500 tabular-nums dark:text-zinc-400">
-					{formatQuantity(item.quantity, item.unit)}
+					{isApproximate ? '≈' : ''}{formatQuantity(displayQuantity, item.unit)}
 				</span>
 				{#if item.fillLevel !== null}
 					<FillBar level={item.fillLevel} />
+				{/if}
+				{#if showLocation}
+					<span
+						class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800
+							dark:text-zinc-400"
+					>
+						{LOCATION_LABELS[item.location]}
+					</span>
 				{/if}
 				{#if item.bestBefore && stage}
 					<!-- Kein Marker für Schätzungen: fast jedes Datum ist geschätzt, das

@@ -2,8 +2,10 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import type { Snippet } from 'svelte';
+	import type { LayoutData } from './$types';
 
-	let { children } = $props();
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
 </script>
 
 <svelte:head>
@@ -14,5 +16,5 @@
 	<main class="pb-nav mx-auto max-w-lg px-4 pt-4">
 		{@render children()}
 	</main>
-	<BottomNav />
+	<BottomNav urgentCount={data.urgentCount} />
 </div>

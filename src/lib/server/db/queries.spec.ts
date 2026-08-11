@@ -8,12 +8,16 @@ import {
 	adjustQuantity,
 	consume,
 	countByLocation,
+	countUrgent,
 	findOrCreateProduct,
 	frequentProducts,
 	lastPurchase,
+	listCategories,
 	listStock,
 	openOne,
-	undoConsume
+	undoConsume,
+	updateCategory,
+	updateStockItem
 } from './queries';
 import { seedCategories, seedDevData } from './seed';
 import { category, product, stockItem } from './schema';
@@ -54,6 +58,34 @@ describe('listStock', () => {
 		for (const loc of ['fridge', 'freezer', 'pantry'] as const) {
 			expect(counts[loc]).toBe(listStock(db, loc).length);
 		}
+	});
+});
+
+describe('countUrgent', () => {
+	it('zählt nur Abgelaufenes und das, was heute oder morgen fällig wird', () => {
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		const before = countUrgent(db);
+
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		const id = addStock(db, { productId: cheese.id, quantity: 1, location: 'fridge' });
+		db.update(stockItem).set({ bestBefore: tomorrow }).where(eq(stockItem.id, id)).run();
+
+		expect(countUrgent(db)).toBe(before + 1);
+	});
+
+	it('zählt Aufgebrauchtes und weit Entferntes nicht mit', () => {
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		const before = countUrgent(db);
+
+		const farOut = new Date();
+		farOut.setDate(farOut.getDate() + 30);
+		const id = addStock(db, { productId: cheese.id, quantity: 1, location: 'fridge' });
+		db.update(stockItem).set({ bestBefore: farOut }).where(eq(stockItem.id, id)).run();
+		expect(countUrgent(db)).toBe(before);
+
+		consume(db, id);
+		expect(countUrgent(db)).toBe(before);
 	});
 });
 
@@ -243,6 +275,105 @@ describe('Geöffnet-Haltbarkeit der Kategorien', () => {
 		// Und dort NULL, wo es keinen macht.
 		expect(byName.get('Tiefkühl')).toBeNull();
 		expect(byName.get('Trockenvorrat')).toBeNull();
+	});
+});
+
+describe('listCategories', () => {
+	it('liefert alle Kategorien, sortiert nach sortOrder', () => {
+		const rows = listCategories(db);
+		expect(rows.length).toBeGreaterThan(0);
+
+		const sortOrders = db
+			.select({ id: category.id, sortOrder: category.sortOrder })
+			.from(category)
+			.all();
+		const bySortOrder = new Map(sortOrders.map((c) => [c.id, c.sortOrder]));
+		const orders = rows.map((r) => bySortOrder.get(r.id)!);
+		expect(orders).toEqual([...orders].sort((a, b) => a - b));
+
+		const first = rows[0];
+		expect(first).toHaveProperty('name');
+		expect(first).toHaveProperty('emoji');
+		expect(first).toHaveProperty('defaultShelfLifeDays');
+		expect(first).toHaveProperty('openedShelfLifeDays');
+	});
+});
+
+describe('updateCategory', () => {
+	it('ändert die Standard-Haltbarkeit', () => {
+		const tofu = db.select().from(category).where(eq(category.name, 'Tofu & Fleischersatz')).get();
+		const target = tofu ?? db.select().from(category).get()!;
+
+		updateCategory(db, target.id, { defaultShelfLifeDays: 42 });
+		const row = db.select().from(category).where(eq(category.id, target.id)).get();
+		expect(row?.defaultShelfLifeDays).toBe(42);
+	});
+
+	it('ignoriert eine ungültige Standard-Haltbarkeit, statt zu werfen', () => {
+		const before = db.select().from(category).get()!;
+		expect(() => updateCategory(db, before.id, { defaultShelfLifeDays: -1 })).not.toThrow();
+		expect(() => updateCategory(db, before.id, { defaultShelfLifeDays: NaN })).not.toThrow();
+
+		const after = db.select().from(category).where(eq(category.id, before.id)).get();
+		expect(after?.defaultShelfLifeDays).toBe(before.defaultShelfLifeDays);
+	});
+
+	it('setzt die Geöffnet-Haltbarkeit ausdrücklich auf NULL', () => {
+		const konserven = db.select().from(category).where(eq(category.name, 'Konserven')).get()!;
+		expect(konserven.openedShelfLifeDays).not.toBeNull();
+
+		updateCategory(db, konserven.id, { openedShelfLifeDays: null });
+		const row = db.select().from(category).where(eq(category.id, konserven.id)).get();
+		expect(row?.openedShelfLifeDays).toBeNull();
+	});
+
+	it('übernimmt gültige Felder, auch wenn andere im selben Aufruf ungültig sind', () => {
+		const before = db.select().from(category).get()!;
+		updateCategory(db, before.id, { defaultShelfLifeDays: -5, openedShelfLifeDays: 3 });
+
+		const row = db.select().from(category).where(eq(category.id, before.id)).get();
+		expect(row?.defaultShelfLifeDays).toBe(before.defaultShelfLifeDays);
+		expect(row?.openedShelfLifeDays).toBe(3);
+	});
+
+	it('ignoriert eine Kommazahl, statt sie in die Integer-Spalte zu runden', () => {
+		const before = db.select().from(category).get()!;
+		updateCategory(db, before.id, { defaultShelfLifeDays: 14.5, openedShelfLifeDays: 3.2 });
+
+		const row = db.select().from(category).where(eq(category.id, before.id)).get();
+		expect(row?.defaultShelfLifeDays).toBe(before.defaultShelfLifeDays);
+		expect(row?.openedShelfLifeDays).toBe(before.openedShelfLifeDays);
+	});
+
+	it('ignoriert eine unplausibel hohe Haltbarkeit', () => {
+		const before = db.select().from(category).get()!;
+		updateCategory(db, before.id, { defaultShelfLifeDays: 3651, openedShelfLifeDays: 4000 });
+
+		const row = db.select().from(category).where(eq(category.id, before.id)).get();
+		expect(row?.defaultShelfLifeDays).toBe(before.defaultShelfLifeDays);
+		expect(row?.openedShelfLifeDays).toBe(before.openedShelfLifeDays);
+	});
+});
+
+describe('updateStockItem', () => {
+	it('setzt consumedAt, wenn die Menge von Hand auf 0 gesetzt wird', () => {
+		const item = db.select().from(stockItem).get()!;
+		expect(item.consumedAt).toBeNull();
+
+		updateStockItem(db, item.id, { quantity: 0 });
+
+		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
+		expect(row?.quantity).toBe(0);
+		expect(row?.consumedAt).not.toBeNull();
+	});
+
+	it('lässt consumedAt unangetastet, wenn die Menge über 0 bleibt', () => {
+		const item = db.select().from(stockItem).get()!;
+
+		updateStockItem(db, item.id, { quantity: 3 });
+
+		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
+		expect(row?.consumedAt).toBeNull();
 	});
 });
 

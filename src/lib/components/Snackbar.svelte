@@ -17,11 +17,15 @@
 	});
 </script>
 
+<!-- Eigene Spur oberhalb des Hinzufuegen-Knopfes (siehe layout.css). Die Leiste
+     ist breit und liegt oben auf — teilte sie sich die Spur mit dem Knopf,
+     deckte sie ihn sechs Sekunden lang zu. Lieber immer derselbe Platz als
+     einer, der davon abhaengt, welcher Screen gerade offen ist. -->
 <div
 	role="status"
 	aria-live="polite"
 	class="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
-	style="bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px))"
+	style="bottom: var(--lane-snackbar)"
 >
 	<div
 		class="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl bg-zinc-900 px-4

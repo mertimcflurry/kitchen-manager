@@ -87,6 +87,21 @@ export function toInputUnit(quantity: number, unit: Unit): { quantity: number; u
 	return { quantity, unit };
 }
 
+/**
+ * Die tatsächlich noch vorhandene Menge eines angebrochenen Postens.
+ *
+ * `quantity` bleibt nach dem Öffnen die ursprünglich gekaufte Menge (200 g
+ * Gouda), `fillLevel` der Anteil davon, der noch da ist. Ohne Verrechnung
+ * stünden in der Liste zwei Zahlen nebeneinander, die sich zu widersprechen
+ * scheinen: „200 g" neben „50 %". Nur für Fortlaufendes (g/ml) — ein
+ * angebrochenes Stück oder eine angebrochene Packung bleibt im Bestand
+ * weiterhin ein ganzes Stück, „0,5 Stück" wäre keine ehrliche Angabe.
+ */
+export function remainingQuantity(quantity: number, unit: Unit, fillLevel: number | null): number {
+	if (fillLevel === null || isCountable(unit)) return quantity;
+	return (quantity * fillLevel) / 100;
+}
+
 const NUMBER = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
 
 /**

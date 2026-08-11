@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
-import { estimateBestBefore } from '../../date';
+import { daysUntil, estimateBestBefore, FRESHNESS_THRESHOLDS } from '../../date';
 import { isCountable } from '../../domain';
 import type { Db } from './client';
 import { category, product, stockItem, type FillLevel, type Location, type Unit } from './schema';
@@ -66,6 +66,25 @@ export function countByLocation(db: Db): Record<Location, number> {
 	const result = { fridge: 0, freezer: 0, pantry: 0 };
 	for (const row of rows) result[row.location] = row.n;
 	return result;
+}
+
+/**
+ * Zählt offene Posten, die abgelaufen sind oder es heute/morgen werden —
+ * dieselbe Schwelle wie der rote/orange Punkt in der Liste. Grundlage für
+ * das Abzeichen an der „Ablauf"-Kachel der Navigation: die ruhige Auskunft
+ * „nichts Dringendes" ohne dafür extra hinzutippen zu müssen, und der Anstoß,
+ * wenn doch etwas brennt.
+ */
+export function countUrgent(db: Db, now: Date = new Date()): number {
+	const rows = db
+		.select({ bestBefore: stockItem.bestBefore })
+		.from(stockItem)
+		.where(isNull(stockItem.consumedAt))
+		.all();
+	return rows.filter(
+		(row) =>
+			row.bestBefore !== null && daysUntil(row.bestBefore, now) <= FRESHNESS_THRESHOLDS.critical
+	).length;
 }
 
 /**
@@ -179,6 +198,14 @@ export function openOne(db: Db, id: number): number | null {
 		.get().id;
 }
 
+/**
+ * Ändert Ort, Einheit, Menge oder MHD eines Postens (Artikel-Detail-Sheet).
+ *
+ * Menge von Hand auf 0 gesetzt bedeutet dasselbe wie das Minus, das die
+ * letzte Einheit abzieht: aufgebraucht. Ohne `consumedAt` bliebe eine
+ * Zombie-Zeile mit Menge 0 stehen, die weder im Bestand noch in „Bald
+ * schlecht" verschwindet — analog zu `adjustQuantity`.
+ */
 export function updateStockItem(
 	db: Db,
 	id: number,
@@ -189,6 +216,7 @@ export function updateStockItem(
 	if (patch.unit) set.unit = patch.unit;
 	if (patch.quantity !== undefined && Number.isFinite(patch.quantity) && patch.quantity >= 0) {
 		set.quantity = patch.quantity;
+		if (patch.quantity === 0) set.consumedAt = new Date();
 	}
 	if (patch.bestBefore !== undefined) {
 		set.bestBefore = patch.bestBefore;
@@ -297,6 +325,61 @@ export function addStock(
 		})
 		.returning({ id: stockItem.id })
 		.get().id;
+}
+
+/** Alle Kategorien für die Einstellungen, in der Reihenfolge der Anzeige. */
+export function listCategories(db: Db) {
+	return db
+		.select({
+			id: category.id,
+			name: category.name,
+			emoji: category.emoji,
+			defaultShelfLifeDays: category.defaultShelfLifeDays,
+			openedShelfLifeDays: category.openedShelfLifeDays
+		})
+		.from(category)
+		.orderBy(asc(category.sortOrder))
+		.all();
+}
+
+/** Großzügige Obergrenze für Haltbarkeitstage — ca. 10 Jahre, reine Plausibilität. */
+const MAX_SHELF_LIFE_DAYS = 3650;
+
+function isValidShelfLifeDays(value: number): boolean {
+	return Number.isInteger(value) && value > 0 && value <= MAX_SHELF_LIFE_DAYS;
+}
+
+/**
+ * Ändert die MHD-Defaults einer Kategorie.
+ *
+ * Speichert bei jedem `change`, ohne Sichern-Knopf — ein Fehlwert im Feld
+ * darf deshalb nicht werfen, sondern wird stillschweigend ignoriert und die
+ * übrigen gültigen Felder trotzdem übernommen. Die Spalten sind Integer, also
+ * muss der Wert eine Ganzzahl sein — „14,5" landete sonst unbemerkt als REAL
+ * in einer INTEGER-Spalte. `openedShelfLifeDays` darf ausdrücklich auf `null`,
+ * das heißt: Öffnen ändert bei dieser Kategorie nichts.
+ */
+export function updateCategory(
+	db: Db,
+	id: number,
+	patch: { defaultShelfLifeDays?: number; openedShelfLifeDays?: number | null }
+): void {
+	const set: Record<string, unknown> = {};
+	if (
+		patch.defaultShelfLifeDays !== undefined &&
+		isValidShelfLifeDays(patch.defaultShelfLifeDays)
+	) {
+		set.defaultShelfLifeDays = patch.defaultShelfLifeDays;
+	}
+	if (patch.openedShelfLifeDays !== undefined) {
+		if (patch.openedShelfLifeDays === null) {
+			set.openedShelfLifeDays = null;
+		} else if (isValidShelfLifeDays(patch.openedShelfLifeDays)) {
+			set.openedShelfLifeDays = patch.openedShelfLifeDays;
+		}
+	}
+	if (Object.keys(set).length === 0) return;
+	db.update(category).set(set).where(eq(category.id, id)).run();
 }
 
 /**

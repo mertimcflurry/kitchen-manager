@@ -215,6 +215,7 @@ auch beim Namen nennen („nimm den ui-ux-Agenten dafür"). `/agents` zeigt sie 
 
 | Agent          | Wofür                                                                    | Modell |
 | -------------- | ------------------------------------------------------------------------ | ------ |
+| `projektchef`  | Priorität, eigene Feature-Ideen, setzt Kleines auch selbst um.           | Opus   |
 | `ui-ux`        | Interaktionsentwurf und Umsetzung. Taps zählen, Alternativen abwägen.    | Opus   |
 | `frontend`     | Screens und Komponenten in Runes, Ladezustände, optimistische Updates.   | Sonnet |
 | `backend-data` | Schema, Migrationen, Queries, Endpoints, KI-Aufrufe samt Validierung.    | Sonnet |
@@ -224,7 +225,9 @@ auch beim Namen nennen („nimm den ui-ux-Agenten dafür"). `/agents` zeigt sie 
 Die übliche Reihenfolge für einen neuen Screen: **ui-ux entwirft und baut**,
 `frontend` übernimmt Feinschliff und Zustände, `backend-data` liefert Daten und
 Actions, `tester` sichert ab, `reviewer` liest am Ende gegen. Bei kleinen
-Änderungen entfällt die Kette — sie ist kein Pflichtweg.
+Änderungen entfällt die Kette — sie ist kein Pflichtweg. `projektchef` sitzt
+davor: er entscheidet, was überhaupt drankommt, und darf kleine Sachen direkt
+umsetzen, statt sie nur an die anderen weiterzureichen.
 
 `reviewer` hat bewusst **keinen Schreibzugriff**: er meldet, er repariert nicht.
 Wer prüft und gleichzeitig repariert, prüft seine eigene Reparatur nicht mehr.

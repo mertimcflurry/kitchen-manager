@@ -6,6 +6,23 @@
 }
 
 @layer base {
+	/*
+	 * Der untere Bildschirmrand ist geteilt, und zwar in dieser Reihenfolge:
+	 *
+	 *   0                Bottom-Nav (4.25rem hoch, z-40)
+	 *   --lane-fab       runder Hinzufuegen-Knopf, 3.5rem hoch (z-30)
+	 *   --lane-snackbar  Undo-Leiste ueber allem (z-50)
+	 *
+	 * Die Spuren stehen hier statt in den Komponenten, weil genau das schon
+	 * einmal schiefging: Leiste und Knopf lagen beide bei ~5.3rem, und die
+	 * Leiste deckte ueber ihre volle Breite den Knopf zu. Wer eine neue feste
+	 * Ecke braucht, haengt sie hier ein, statt eine Zahl zu schaetzen.
+	 */
+	:root {
+		--lane-fab: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+		--lane-snackbar: calc(9.25rem + env(safe-area-inset-bottom, 0px));
+	}
+
 	html {
 		/* Kein graues Aufblitzen beim Antippen — die App gibt eigenes Feedback. */
 		-webkit-tap-highlight-color: transparent;

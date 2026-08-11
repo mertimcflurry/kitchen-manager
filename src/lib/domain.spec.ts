@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatQuantity, isCountable, toBaseUnit, toInputUnit } from './domain';
+import { formatQuantity, isCountable, remainingQuantity, toBaseUnit, toInputUnit } from './domain';
 
 describe('toBaseUnit', () => {
 	it('rechnet kg und l auf die Basiseinheit herunter', () => {
@@ -51,5 +51,24 @@ describe('isCountable', () => {
 		expect(isCountable('pack')).toBe(true);
 		expect(isCountable('g')).toBe(false);
 		expect(isCountable('ml')).toBe(false);
+	});
+});
+
+describe('remainingQuantity', () => {
+	it('verrechnet Füllstand und Menge bei loser Ware', () => {
+		// 200 g Gouda, halb aufgebraucht: „200 g" neben „50 %" wäre irreführend.
+		expect(remainingQuantity(200, 'g', 50)).toBe(100);
+		expect(remainingQuantity(1000, 'ml', 25)).toBe(250);
+	});
+
+	it('lässt ungeöffnete Posten unangetastet', () => {
+		expect(remainingQuantity(200, 'g', null)).toBe(200);
+	});
+
+	it('lässt Zählbares unangetastet, auch wenn ein Stück angebrochen ist', () => {
+		// Ein angefangener Joghurt bleibt im Bestand ein ganzes Stück —
+		// „0,75 Stück" wäre keine ehrliche Angabe.
+		expect(remainingQuantity(1, 'piece', 75)).toBe(1);
+		expect(remainingQuantity(3, 'pack', 50)).toBe(3);
 	});
 });

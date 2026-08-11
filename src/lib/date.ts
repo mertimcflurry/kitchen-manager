@@ -8,6 +8,15 @@
 /** Schwellen in Tagen, ab denen die Ampel umschlägt. */
 export const FRESHNESS_THRESHOLDS = { critical: 1, soon: 3 } as const;
 
+/**
+ * Wie weit „Bald schlecht" nach vorn schaut.
+ *
+ * Eine Woche ist der Horizont, den man beim Kochen tatsächlich überblickt.
+ * Weiter gefasst stünde dort halb der Vorrat und der Screen wäre wieder nur
+ * eine zweite Bestandsliste — dann läse ihn niemand.
+ */
+export const EXPIRY_HORIZON_DAYS = 7;
+
 export type Freshness = 'expired' | 'critical' | 'soon' | 'fine';
 
 function startOfDay(date: Date): Date {

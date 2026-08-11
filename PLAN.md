@@ -200,10 +200,22 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### M4 — MHD
 
-- [ ] Automatische Schätzung aus Kategorie beim Anlegen
-- [ ] Pro Artikel überschreibbar, Schätzung optisch unterscheidbar
-- [ ] „Bald schlecht"-Ansicht mit Ampel
-- [ ] Einstellungen: Kategorie-Haltbarkeiten editierbar (Tastatur erlaubt)
+- [x] Automatische Schätzung aus Kategorie beim Anlegen
+- [x] Pro Artikel überschreibbar, Schätzung optisch unterscheidbar
+- [x] „Bald schlecht"-Ansicht mit Ampel — ortsübergreifend, Horizont 7 Tage,
+      drei Blöcke (abgelaufen / heute und morgen / diese Woche)
+- [x] Einstellungen: Kategorie-Haltbarkeiten editierbar (Tastatur erlaubt),
+      erreichbar über das Symbol oben rechts im Bestand
+- [x] **Abzeichen an der „Ablauf"-Kachel der Bottom-Nav.** Zählt Abgelaufenes
+      und heute/morgen Fälliges (`countUrgent()`, dieselbe Schwelle wie der
+      rote/orange Punkt in der Liste), geladen in `+layout.server.ts` und
+      damit auf jeder Seite sichtbar. Der Tap-Test: null zusätzliche Taps, man
+      sieht beim Öffnen der App sofort, ob überhaupt etwas dringend ist, statt
+      dafür extra auf „Ablauf" tippen zu müssen. `invalidateAll()` nach jeder
+      Bestandsänderung (schon vorhanden, siehe `forms.ts`) hält die Zahl aktuell.
+- [ ] **Am Handy gegenprüfen**: Blocküberschriften im Küchenlicht, Zahlenfelder
+      in den Einstellungen, Undo-Leiste über dem Plus-Knopf, Lesbarkeit des
+      roten Abzeichens auf der Nav-Leiste bei Sonnenlicht
 
 ### M5 — Bon-Import
 
@@ -268,17 +280,23 @@ Angenommene Defaults, bis widersprochen wird:
 Aufgefallen beim Benutzen, bewusst nicht sofort gelöst. Erst entscheiden, wenn
 klar ist, ob es im Alltag stört.
 
-- [ ] **Undo-Leiste verdeckt den Plus-Knopf.** Beide liegen in derselben Spur:
-      Leiste bei `5.5rem`, Knopf bei `5.25rem` (`Snackbar.svelte` bzw.
-      `+page.svelte`), und die Leiste ist über die volle Breite. Entstanden erst,
-      als der Hinzufügen-Knopf zum Kreis wurde. Mögliche Wege: Leiste schmaler
-      und links ausrichten, oder ein Schließen-Kreuz statt der vollen Breite,
-      oder den Knopf während der Leiste ausblenden. Kleine Sache, aber sie
-      blockiert eine Aktion.
-- [ ] **Lose Ware: Menge und Füllstand widersprechen sich.** Beim Gouda steht
-      „200 g" neben „50 %" — die 200 g sind das Kaufgewicht, nicht der Rest.
-      Möglich wäre, daraus „ca. 100 g" abzuleiten. Frage dahinter: ist bei loser
-      Ware die Menge oder der Füllstand die führende Angabe?
+- [x] **Undo-Leiste verdeckt den Plus-Knopf.** Gelöst über feste Spuren: der
+      untere Streifen ist in `layout.css` als `--lane-fab` (5.25rem) und
+      `--lane-snackbar` (9.25rem) festgeschrieben, die Leiste liegt damit
+      immer über dem Knopf. Verworfen: Leiste schmaler und links ausrichten
+      (auf 360 px bleibt für „Käse aufgebraucht" + „Rückgängig" kein Platz
+      neben einem 3.5rem-Kreis), und den Knopf ausblenden (nimmt sechs Sekunden
+      lang eine Aktion weg und lässt das Layout springen). Neue feste Ecken
+      hängen sich an eine Spur, statt eine Zahl zu schätzen.
+- [x] **Lose Ware: Menge und Füllstand widersprechen sich.** Gelöst über
+      `remainingQuantity()` in `domain.ts`: die Liste zeigt bei angebrochener
+      loser Ware (g/ml) die verrechnete Restmenge mit „≈" statt der gekauften
+      — aus „200 g" neben „50 %" wird „≈100 g". `quantity` bleibt in der DB
+      unverändert das Kaufgewicht, nur die Anzeige rechnet um; das Menge-Feld
+      im Detail-Sheet zeigt weiterhin den Rohwert, weil man dort das Kaufgewicht
+      korrigiert, nicht die Restmenge. Zählbares (Stück, Packung) bleibt
+      unangetastet — „0,75 Stück" wäre keine ehrliche Angabe zu einem
+      angebrochenen Joghurt.
 - [ ] **Nachkauf erzeugt eine zweite Zeile.** Vier neue Hafermilch neben den
       alten sind zwei Posten mit verschiedenen Daten — richtig, aber die Liste
       wird länger. Alternative: eine gruppierte Zeile je Produkt mit
@@ -294,6 +312,45 @@ klar ist, ob es im Alltag stört.
       Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
       im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
       klareres Zeichen, nicht als Fragezeichen.
+
+## 4c. Aus dem Review offen (M4)
+
+`reviewer` hat die M4-Umsetzung (Ablauf-Screen, Einstellungen, Undo/Plus-Fix)
+gegengelesen, bevor sie committet wurde. Befunde 1–7 und 10 sind behoben
+(backend-data und frontend parallel, `check`/`lint`/`test`/`build` grün,
+100 Tests):
+
+- [x] **Kein Fehler-Handling in `src/lib/forms.ts`.** `post()` fängt jetzt
+      `fetch`/`deserialize`-Fehler ab und ruft in jedem Fehlerfall (Wurf,
+      `error`, `failure`) `invalidateAll()` auf, damit die UI wieder den
+      echten Serverstand zeigt statt einer stehengebliebenen optimistischen
+      Änderung.
+- [x] **Einstellungen: Rückfall auf den letzten gültigen Wert greift nicht.**
+      Der `use:enhance`-Callback setzt die betroffenen `<input>`-Elemente bei
+      Fehlschlag jetzt direkt per DOM auf den zuletzt bekannten gültigen Wert
+      zurück, statt sich auf Svelte-Reaktivität zu verlassen (Falle: `set_value`
+      cacht den zuletzt gesetzten Wert und überspringt sonst das Update).
+- [x] **Einstellungen: leeres „hält Tage" meldet fälschlich „gespeichert".**
+      Löst jetzt `fail(400, …)` aus statt `undefined` still zu lassen.
+- [x] **Einstellungen: keine Ganzzahlprüfung.** `updateCategory` prüft jetzt
+      `Number.isInteger` plus eine Obergrenze von 3650 Tagen für beide Felder;
+      die harte Fehlermeldung sitzt in der Action-Schicht.
+- [x] **`undo`-Action prüft `fillLevel` jetzt gegen `FILL_LEVELS`,** wie schon
+      die Schwester-Action `fill`.
+- [x] **Menge manuell auf „0" setzen setzt jetzt `consumedAt`,** analog zu
+      `adjustQuantity` — keine Zombie-Zeile mehr.
+- [x] **Undo-Timer startet bei zwei schnellen Aktionen neu.** Beide
+      Snackbar-Nutzungen (`/` und `/ablauf`) stecken jetzt in
+      `{#key undoState.id}`, ein neues Undo erzwingt einen echten Remount.
+- [x] **FAB-Überlappung behoben.** `src/routes/+page.svelte` hat zusätzliches
+      `pb-20` an der Bestandsliste, nur dort — `/ablauf` hat keinen FAB.
+      **Am Handy gegenprüfen**, ob es reicht.
+
+Zurückgestellt, niedrige Priorität: doppeltes `parseId`/`parseLocation`
+zwischen `stock-actions.ts`, `einstellungen/+page.server.ts` und
+`hinzufuegen/+page.server.ts`; generische Fehlermeldung in den Einstellungen
+statt Server-Text; Datums-Label wie „heute" veraltet, wenn die Seite über
+Mitternacht offen bleibt.
 
 ## 5. Bewusst weggelassen
 
