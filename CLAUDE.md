@@ -205,6 +205,28 @@ docker compose down
 - Bei Arbeit an KI-Code die `claude-api`-Skill laden, statt Modell-IDs,
   Preise oder SDK-Signaturen aus dem Gedächtnis zu schreiben.
 
+## Subagenten
+
+Liegen als Markdown mit YAML-Frontmatter in `.claude/agents/` und gehen mit ins
+Repo. Sie werden automatisch anhand ihrer `description` ausgewählt; man kann sie
+auch beim Namen nennen („nimm den ui-ux-Agenten dafür"). `/agents` zeigt sie an.
+
+| Agent          | Wofür                                                                    | Modell |
+| -------------- | ------------------------------------------------------------------------ | ------ |
+| `ui-ux`        | Interaktionsentwurf und Umsetzung. Taps zählen, Alternativen abwägen.    | Opus   |
+| `frontend`     | Screens und Komponenten in Runes, Ladezustände, optimistische Updates.   | Sonnet |
+| `backend-data` | Schema, Migrationen, Queries, Endpoints, KI-Aufrufe samt Validierung.    | Sonnet |
+| `reviewer`     | Nur lesend. Prüft nach jedem Meilenstein, sucht zuerst nach Key-Lecks.   | Opus   |
+| `tester`       | Tests schreiben, ausführen, Fehlschläge beheben. Darf den Server prüfen. | Sonnet |
+
+Die übliche Reihenfolge für einen neuen Screen: **ui-ux entwirft und baut**,
+`frontend` übernimmt Feinschliff und Zustände, `backend-data` liefert Daten und
+Actions, `tester` sichert ab, `reviewer` liest am Ende gegen. Bei kleinen
+Änderungen entfällt die Kette — sie ist kein Pflichtweg.
+
+`reviewer` hat bewusst **keinen Schreibzugriff**: er meldet, er repariert nicht.
+Wer prüft und gleichzeitig repariert, prüft seine eigene Reparatur nicht mehr.
+
 ## Was NICHT gemacht werden soll
 
 - **Keine Authentifizierung**, keine Nutzerverwaltung, keine Mandantenfähigkeit.
