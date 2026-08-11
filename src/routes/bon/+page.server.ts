@@ -62,17 +62,27 @@ export const actions: Actions = {
 		}
 
 		const receiptId = createPendingReceipt(db);
-		const dir = receiptDir();
-		await mkdir(dir, { recursive: true });
-
 		const images: ReceiptImage[] = [];
-		for (const [index, file] of files.entries()) {
-			const buffer = Buffer.from(await file.arrayBuffer());
-			const extension = file.type.split('/')[1];
-			const name = `${receiptId}-${index + 1}.${extension}`;
-			await writeFile(join(dir, name), buffer);
-			addReceiptImage(db, receiptId, join(dir, name), index);
-			images.push({ data: buffer.toString('base64'), mediaType: file.type as AllowedType });
+
+		// Voller Datenträger oder fehlende Rechte im Container: die Aufnahmen
+		// bleiben im Browser liegen, also gehört hier ein Satz hin, mit dem man
+		// etwas anfangen kann — keine Fehlerseite, die den Bon wegwirft.
+		try {
+			const dir = receiptDir();
+			await mkdir(dir, { recursive: true });
+
+			for (const [index, file] of files.entries()) {
+				const buffer = Buffer.from(await file.arrayBuffer());
+				const extension = file.type.split('/')[1];
+				const path = join(dir, `${receiptId}-${index + 1}.${extension}`);
+				await writeFile(path, buffer);
+				addReceiptImage(db, receiptId, path, index);
+				images.push({ data: buffer.toString('base64'), mediaType: file.type as AllowedType });
+			}
+		} catch (cause) {
+			console.error('[bon] Aufnahme nicht speicherbar', cause);
+			discardReceipt(db, receiptId);
+			return fail(500, { message: 'Die Aufnahme ließ sich nicht speichern.' });
 		}
 
 		let analysis;
