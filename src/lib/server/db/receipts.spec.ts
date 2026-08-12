@@ -14,6 +14,7 @@ import {
 	saveParsedLines
 } from './receipts';
 import { seedCategories } from './seed';
+import { addTextToList, listShopping } from './shopping';
 import { category, product, productAlias, receipt, receiptLine, stockItem } from './schema';
 
 let db: Db;
@@ -120,6 +121,20 @@ describe('confirmReceipt', () => {
 		expect(items).toHaveLength(2);
 		expect(items.every((item) => item.receiptId === id)).toBe(true);
 		expect(items[0].bestBefore).not.toBeNull();
+	});
+
+	it('hakt ab, was auf der Einkaufsliste stand', () => {
+		addTextToList(db, 'Tofu natur');
+		addTextToList(db, 'Zahnpasta');
+
+		const id = seedReceipt();
+		confirmReceipt(db, id, decide(id));
+
+		// Der Bon weiß, was im Wagen lag — die Liste muss man dafür nicht
+		// zweimal durchgehen. Was nicht auf dem Bon stand, bleibt offen.
+		const list = listShopping(db);
+		expect(list.done.map((row) => row.name)).toEqual(['Tofu natur']);
+		expect(list.open.map((row) => row.name)).toEqual(['Zahnpasta']);
 	});
 
 	it('lernt für jede bestätigte Zeile einen Alias', () => {

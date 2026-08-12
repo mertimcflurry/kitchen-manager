@@ -13,6 +13,7 @@ import { normalizeRawText } from '../ai/receipt-parse';
 import type { Location, Unit } from '../../domain';
 import type { Db, DbOrTx } from './client';
 import { addStock, findOrCreateProduct } from './queries';
+import { markProductBought } from './shopping';
 import { category, product, productAlias, receipt, receiptImage, receiptLine } from './schema';
 
 /** Kaufdatum vom Bon, sonst heute. */
@@ -262,6 +263,8 @@ export function confirmReceipt(
 				.run();
 
 			rememberAlias(tx, row.rawText, productId, head.store ?? undefined);
+			// Was im Wagen lag, muss man zu Hause nicht noch abhaken.
+			markProductBought(tx, productId, decision.name);
 			added++;
 		}
 
