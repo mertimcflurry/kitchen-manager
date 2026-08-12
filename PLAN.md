@@ -402,7 +402,10 @@ die kennt die Seite ohne Modell.
   sondern eine Antwort. „Anderer Vorschlag" kann dasselbe mit einer
   Entscheidung weniger.
 - **Keine Rezept-Historie**, keine Sammlung — steht so in `CLAUDE.md` und §5,
-  hier nur bestätigt.
+  hier nur bestätigt. Nachtrag: beim Planen als „wäre cool" genannt — das
+  steht in echter Spannung zu `CLAUDE.md`s „keine Rezeptdatenbank, wir pflegen
+  keine eigene Sammlung". Falls das später ernsthaft gewünscht wird, ändert
+  sich zuerst `CLAUDE.md`, nicht heimlich der Code.
 
 ### M9 — Betrieb
 
@@ -571,7 +574,11 @@ klar ist, ob es im Alltag stört.
       braucht kein Diätprofil — „gefällt mir nicht" beantwortet ein Tap auf
       „anderer Vorschlag", und das ist ein Screen weniger als eine Liste von
       Abneigungen, die gepflegt werden will. Wieder aufmachen, falls dieselbe
-      ungeliebte Zutat dreimal hintereinander vorgeschlagen wird.
+      ungeliebte Zutat dreimal hintereinander vorgeschlagen wird. Nachtrag:
+      bei Zutaten aus dem eigenen Bestand ohnehin wenig Hebel — die stehen ja
+      schon im Kühlschrank. Interessanter wäre es erst bei M7, für Vorschläge
+      zu Dingen, die noch nicht da sind (Einkaufsliste) — dort aber noch nicht
+      geplant, nur als möglicher späterer Anknüpfungspunkt vermerkt.
 - [ ] **Das Rezept überlebt keinen Seitenwechsel.** Es lebt im Ergebnis der
       Form-Action; wer während des Kochens auf „Bestand" tippt, verliert es.
       Bewusst so für die erste Fassung — eine Sammlung ist ausgeschlossen (§5).
