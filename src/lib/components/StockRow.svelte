@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { formatDaysUntil, freshness, type Freshness } from '$lib/date';
-	import { formatQuantity, isCountable, LOCATION_LABELS, remainingQuantity } from '$lib/domain';
+	import {
+		countFillLevel,
+		formatQuantity,
+		isCountable,
+		LOCATION_LABELS,
+		remainingQuantity
+	} from '$lib/domain';
 	import type { StockRow } from '$lib/server/db/queries';
 	import FillBar from './FillBar.svelte';
 
@@ -33,6 +39,20 @@
 	// gekaufte — sonst stehen „200 g" und „50 %" scheinbar im Widerspruch.
 	const displayQuantity = $derived(remainingQuantity(item.quantity, item.unit, item.fillLevel));
 	const isApproximate = $derived(!countable && item.fillLevel !== null);
+
+	/**
+	 * Ein Balken je Zeile, zwei Quellen.
+	 *
+	 * Bei loser Ware kommt er aus dem Füllstand der angebrochenen Packung, bei
+	 * Zählbarem aus dem Verhältnis zur Startmenge — sechs von zehn Eiern sind
+	 * knapp zwei Drittel. Für den Blick in den Kühlschrank ist das dieselbe
+	 * Frage, also darf es nicht zwei verschiedene Zeichen dafür geben. Bleibt
+	 * `null`, solange nichts entnommen wurde: ein Balken, der in jeder Zeile
+	 * voll steht, sagt nichts und macht die Liste nur unruhig.
+	 */
+	const bar = $derived(
+		item.fillLevel ?? countFillLevel(item.quantity, item.initialQuantity, item.unit)
+	);
 
 	const dotClass: Record<Freshness, string> = {
 		expired: 'bg-red-500',
@@ -132,8 +152,8 @@
 				<span class="text-zinc-500 tabular-nums dark:text-zinc-400">
 					{isApproximate ? '≈' : ''}{formatQuantity(displayQuantity, item.unit)}
 				</span>
-				{#if item.fillLevel !== null}
-					<FillBar level={item.fillLevel} />
+				{#if bar !== null}
+					<FillBar level={bar} />
 				{/if}
 				{#if showLocation}
 					<span

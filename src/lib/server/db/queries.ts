@@ -12,6 +12,8 @@ export type StockRow = {
 	emoji: string;
 	categoryName: string;
 	quantity: number;
+	/** Womit der Posten angefangen hat — Bezugsgröße für den Balken bei Zählbarem. */
+	initialQuantity: number | null;
 	unit: Unit;
 	location: Location;
 	bestBefore: Date | null;
@@ -36,6 +38,7 @@ export function listStock(db: Db, location?: Location): StockRow[] {
 			emoji: category.emoji,
 			categoryName: category.name,
 			quantity: stockItem.quantity,
+			initialQuantity: stockItem.initialQuantity,
 			unit: stockItem.unit,
 			location: stockItem.location,
 			bestBefore: stockItem.bestBefore,
@@ -90,6 +93,10 @@ export function countUrgent(db: Db, now: Date = new Date()): number {
 /**
  * Ändert die Stückzahl. Erreicht sie null, gilt der Posten als aufgebraucht —
  * dann ist das Minus zugleich die letzte Entnahme, ohne zweite Geste.
+ *
+ * Das Plus über die Startmenge hinaus hebt diese mit an: wer zu den fünf
+ * restlichen Eiern zehn dazulegt, hat fünfzehn von fünfzehn und keinen Balken
+ * bei 150 %.
  */
 export function adjustQuantity(db: Db, id: number, delta: number): void {
 	const item = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
@@ -97,7 +104,11 @@ export function adjustQuantity(db: Db, id: number, delta: number): void {
 
 	const next = Math.max(0, item.quantity + delta);
 	db.update(stockItem)
-		.set({ quantity: next, consumedAt: next === 0 ? new Date() : null })
+		.set({
+			quantity: next,
+			initialQuantity: Math.max(next, item.initialQuantity ?? next),
+			consumedAt: next === 0 ? new Date() : null
+		})
 		.where(eq(stockItem.id, id))
 		.run();
 }
@@ -186,6 +197,9 @@ export function openOne(db: Db, id: number): number | null {
 		.values({
 			productId: item.productId,
 			quantity: 1,
+			// Das abgeteilte Stück fängt bei eins an; der Restposten behält seine
+			// alte Startmenge und zeigt damit ehrlich „drei von vier".
+			initialQuantity: 1,
 			unit: item.unit,
 			location: item.location,
 			bestBefore,
@@ -205,6 +219,11 @@ export function openOne(db: Db, id: number): number | null {
  * letzte Einheit abzieht: aufgebraucht. Ohne `consumedAt` bliebe eine
  * Zombie-Zeile mit Menge 0 stehen, die weder im Bestand noch in „Bald
  * schlecht" verschwindet — analog zu `adjustQuantity`.
+ *
+ * Eine hier eingetragene Menge setzt zugleich die Startmenge neu. Im Sheet
+ * korrigiert man, was gekauft wurde („waren doch zwölf Eier"), entnommen wird
+ * über das Minus in der Liste — sonst hinge der Balken an einer Zahl, die
+ * inzwischen falsch ist.
  */
 export function updateStockItem(
 	db: Db,
@@ -216,6 +235,7 @@ export function updateStockItem(
 	if (patch.unit) set.unit = patch.unit;
 	if (patch.quantity !== undefined && Number.isFinite(patch.quantity) && patch.quantity >= 0) {
 		set.quantity = patch.quantity;
+		set.initialQuantity = patch.quantity;
 		if (patch.quantity === 0) set.consumedAt = new Date();
 	}
 	if (patch.bestBefore !== undefined) {
@@ -327,6 +347,8 @@ export function addStock(
 		.values({
 			productId: input.productId,
 			quantity,
+			// Ein frischer Posten ist per Definition voll.
+			initialQuantity: quantity,
 			unit,
 			location: input.location,
 			purchasedAt,

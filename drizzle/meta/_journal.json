@@ -43,6 +43,20 @@
       "when": 1786490578402,
       "tag": "0005_famous_pepper_potts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786492808104,
+      "tag": "0006_colorful_kronos",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1786492828777,
+      "tag": "0007_backfill_initial_quantity",
+      "breakpoints": true
     }
   ]
 }

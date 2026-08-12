@@ -129,6 +129,8 @@ const DEV_PRODUCTS = [
 const DEV_STOCK: Array<{
 	product: string;
 	quantity: number;
+	/** Startmenge, falls schon etwas entnommen wurde — sonst gleich `quantity`. */
+	initial?: number;
 	location: Location;
 	boughtDaysAgo: number;
 	/** Prozent für angebrochene Ware, weggelassen heißt ungeöffnet. */
@@ -150,7 +152,9 @@ const DEV_STOCK: Array<{
 		openedDaysAgo: 2
 	},
 	{ product: 'Gouda', quantity: 200, location: 'fridge', boughtDaysAgo: 18 },
-	{ product: 'Eier', quantity: 6, location: 'fridge', boughtDaysAgo: 5 },
+	// Ein Zehnerkarton, vier davon schon gegessen: die Zeile, an der man den
+	// Balken für Zählbares sieht.
+	{ product: 'Eier', quantity: 6, initial: 10, location: 'fridge', boughtDaysAgo: 5 },
 	{ product: 'Tofu natur', quantity: 2, location: 'fridge', boughtDaysAgo: 3 },
 	{ product: 'Kichererbsen', quantity: 4, location: 'pantry', boughtDaysAgo: 30 },
 	{ product: 'Erbsen TK', quantity: 750, location: 'freezer', boughtDaysAgo: 20 }
@@ -208,6 +212,7 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 			.values({
 				productId: prod.id,
 				quantity: s.quantity,
+				initialQuantity: s.initial ?? s.quantity,
 				unit: prod.defaultUnit,
 				location: s.location,
 				purchasedAt,

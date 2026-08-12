@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	countFillLevel,
 	defaultLocationFor,
 	formatQuantity,
 	isCountable,
@@ -92,5 +93,35 @@ describe('defaultLocationFor', () => {
 		// der Prüf-Screen wie vorher.
 		expect(defaultLocationFor('Milchprodukte')).toBe('fridge');
 		expect(defaultLocationFor('Erfundene Kategorie')).toBe('fridge');
+	});
+});
+
+describe('countFillLevel', () => {
+	it('macht aus fünf von zehn Eiern die Hälfte', () => {
+		expect(countFillLevel(5, 10, 'piece')).toBe(50);
+		expect(countFillLevel(7, 10, 'piece')).toBe(75);
+		expect(countFillLevel(3, 10, 'piece')).toBe(25);
+		expect(countFillLevel(3, 4, 'pack')).toBe(75);
+	});
+
+	it('lässt auch beim letzten Stück noch ein Segment stehen', () => {
+		// Ein leerer Balken sähe aus wie ein Fehler, obwohl noch ein Ei da ist.
+		expect(countFillLevel(1, 10, 'piece')).toBe(25);
+	});
+
+	it('bleibt weg, solange nichts entnommen wurde', () => {
+		// Ein Balken, der in jeder Zeile voll steht, sagt nichts.
+		expect(countFillLevel(10, 10, 'piece')).toBeNull();
+		expect(countFillLevel(12, 10, 'piece')).toBeNull();
+	});
+
+	it('bleibt weg bei Einzelstücken und ohne bekannte Startmenge', () => {
+		expect(countFillLevel(1, 1, 'piece')).toBeNull();
+		expect(countFillLevel(5, null, 'piece')).toBeNull();
+	});
+
+	it('rührt lose Ware nicht an — die hat ihren Füllstand', () => {
+		expect(countFillLevel(100, 200, 'g')).toBeNull();
+		expect(countFillLevel(500, 1000, 'ml')).toBeNull();
 	});
 });

@@ -113,6 +113,28 @@ describe('adjustQuantity', () => {
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.quantity).toBe(0);
 	});
+
+	it('lässt die Startmenge stehen, wenn entnommen wird', () => {
+		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
+		expect(eggs.initialQuantity).toBe(10);
+
+		adjustQuantity(db, eggs.id, -1);
+		const after = listStock(db).find((r) => r.id === eggs.id)!;
+		expect(after.quantity).toBe(eggs.quantity - 1);
+		// Der Balken misst gegen die Startmenge — sie darf beim Entnehmen nicht
+		// mitwandern, sonst stünde die Zeile immer auf „voll".
+		expect(after.initialQuantity).toBe(10);
+	});
+
+	it('hebt die Startmenge an, wenn über sie hinaus nachgelegt wird', () => {
+		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
+		adjustQuantity(db, eggs.id, +10);
+
+		const after = listStock(db).find((r) => r.id === eggs.id)!;
+		expect(after.quantity).toBe(16);
+		// Sonst zeigte der Balken 160 Prozent.
+		expect(after.initialQuantity).toBe(16);
+	});
 });
 
 describe('consume und undo', () => {
@@ -199,6 +221,11 @@ describe('openOne', () => {
 		expect(sealed?.fillLevel).toBeNull();
 		expect(opened?.quantity).toBe(1);
 		expect(opened?.fillLevel).toBe(100);
+
+		// Der Restposten misst weiter gegen die vier gekauften — „drei von vier".
+		// Das abgeteilte Stück fängt bei sich selbst an.
+		expect(sealed?.initialQuantity).toBe(4);
+		expect(opened?.initialQuantity).toBe(1);
 	});
 
 	it('gibt dem Geöffneten die kürzere Haltbarkeit', () => {
@@ -374,6 +401,17 @@ describe('updateStockItem', () => {
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.consumedAt).toBeNull();
+	});
+
+	it('setzt die Startmenge neu — im Sheet korrigiert man den Kauf, nicht die Entnahme', () => {
+		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
+		expect(eggs.initialQuantity).toBe(10);
+
+		// „Waren doch zwölf" ist eine Korrektur der Packung, keine Entnahme.
+		updateStockItem(db, eggs.id, { quantity: 12 });
+
+		const row = db.select().from(stockItem).where(eq(stockItem.id, eggs.id)).get();
+		expect(row?.initialQuantity).toBe(12);
 	});
 });
 

@@ -76,6 +76,19 @@ export const stockItem = sqliteTable(
 			.notNull()
 			.references(() => product.id, { onDelete: 'cascade' }),
 		quantity: real('quantity').notNull().default(1),
+		/**
+		 * Die Menge, mit der dieser Posten angefangen hat.
+		 *
+		 * Ohne sie weiß eine Zeile mit „5 Stk" nicht, ob sie einmal zehn Eier
+		 * waren oder sechs — und der Balken in der Liste hätte nichts, wogegen
+		 * er rechnen könnte. Bewusst am Posten und nicht aus dem letzten Kauf
+		 * desselben Produkts abgeleitet: der letzte Kauf kann eine ganz andere
+		 * Gebindegröße gewesen sein, dann zeigte der Balken Unsinn.
+		 *
+		 * NULL heißt „unbekannt" — Zeilen von vor dieser Spalte, siehe
+		 * `drizzle/0007_backfill_initial_quantity.sql`. Dann bleibt der Balken weg.
+		 */
+		initialQuantity: real('initial_quantity'),
 		unit: text('unit', { enum: UNITS }).notNull().default('piece'),
 		location: text('location', { enum: LOCATIONS }).notNull().default('fridge'),
 		bestBefore: integer('best_before', { mode: 'timestamp' }),

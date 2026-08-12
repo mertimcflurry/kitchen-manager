@@ -133,6 +133,45 @@ export function remainingQuantity(quantity: number, unit: Unit, fillLevel: numbe
 	return (quantity * fillLevel) / 100;
 }
 
+/**
+ * Der Anteil eines Postens, der noch da ist — als eine der vier Stufen.
+ *
+ * Rundet auf die nächstgelegene Stufe und nie auf null: solange noch ein Ei im
+ * Karton liegt, leuchtet mindestens ein Segment. Ein leerer Balken sähe aus
+ * wie ein Fehler, obwohl noch etwas da ist; „fast leer" ist die Aussage, und
+ * die trägt das unterste Viertel.
+ */
+export function nearestFillLevel(fraction: number): FillLevel {
+	const percent = fraction * 100;
+	if (percent >= 87.5) return 100;
+	if (percent >= 62.5) return 75;
+	if (percent >= 37.5) return 50;
+	return 25;
+}
+
+/**
+ * Der Balken für Zählbares: fünf von zehn Eiern sind eben halb.
+ *
+ * Bei loser Ware sagt `fillLevel`, wie viel von einer angebrochenen Packung
+ * übrig ist. Zählbares hat kein `fillLevel` — aber es hat eine Startmenge, und
+ * damit dieselbe Aussage: wie viel vom Gekauften ist noch da. Der Balken zeigt
+ * beides in derselben Sprache, sonst müsste man zwei Zeichen lernen.
+ *
+ * Null heißt: kein Balken. Der Balken erscheint erst, wenn etwas entnommen
+ * wurde, und nur bei Gebinden ab zwei Stück — bei einem einzelnen Brot wäre er
+ * entweder voll oder weg und stünde damit sinnlos in jeder zweiten Zeile.
+ */
+export function countFillLevel(
+	quantity: number,
+	initialQuantity: number | null,
+	unit: Unit
+): FillLevel | null {
+	if (!isCountable(unit)) return null;
+	if (initialQuantity === null || initialQuantity <= 1) return null;
+	if (quantity <= 0 || quantity >= initialQuantity) return null;
+	return nearestFillLevel(quantity / initialQuantity);
+}
+
 const NUMBER = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
 
 /**
