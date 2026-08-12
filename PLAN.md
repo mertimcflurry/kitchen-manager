@@ -163,6 +163,12 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ## 3. Meilensteine
 
+**Stand 2026-08-12:** M0–M7 stehen im Code, `check`/`lint`/`test`/`build`
+laufen sauber (154 Tests). Offen ist überall nur noch das Gegenprüfen am
+Handy — die Punkte stehen bei den jeweiligen Meilensteinen. Als Nächstes
+sinnvoll: **M8 (Rezeptvorschlag)** oder **M9 (Betrieb im Container)**; M9 hat
+den Aufräumjob für Bon-Bilder als offene Zutat (§4).
+
 ### M0 — Kontext und Repo ✅
 
 - [x] Umgebung erfasst, Konflikte geklärt
