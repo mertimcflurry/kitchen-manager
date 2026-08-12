@@ -40,6 +40,7 @@ trotzdem sauber auswertbar.
 | `id`                       | int PK  |                                                  |
 | `product_id`               | int FK  |                                                  |
 | `quantity`                 | real    | Zahl, geändert über +/- — nie Tastatur           |
+| `initial_quantity`         | real?   | Startmenge — Bezugsgröße für den Balken          |
 | `unit`                     | text    | vom Produkt vorbelegt                            |
 | `location`                 | text    | `fridge` \| `freezer` \| `pantry` (feste Liste)  |
 | `best_before`              | int?    | geschätzt oder überschrieben                     |
@@ -248,6 +249,9 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [x] Sichtbar machen, was ohne Raten erkannt wurde: bekannte Zeilen tragen
       im Prüf-Screen „bekannt" und gelten als sicher. Eine Statistik darüber
       hinaus wäre eine Zahl, die niemand antippt.
+- [x] Nachgeschärft nach dem ersten echten Bon: Gebinde werden nach ihrem
+      Inhalt gezählt (10 Eier statt 1 Karton), und der Ort einer Zeile kommt
+      aus ihrer Kategorie statt pauschal aus dem Kühlschrank. Beides in §4b.
 
 ### M7 — Auswertung und Einkaufsliste
 
@@ -339,15 +343,39 @@ klar ist, ob es im Alltag stört.
       Produkt. Der Gewinn ist echt, nur ein anderer: nicht weniger Tokens,
       sondern weniger Korrigieren im Prüf-Screen — und beim zweiten Einkauf
       ist „BIO-TOFU NAT 400G" wieder derselbe Artikel und nicht ein zweiter.
-- [ ] **Standardort je Kategorie.** Der Prüf-Screen legt alles erst einmal in
-      den Kühlschrank; Tiefkühlpizza und Nudeln muss man einzeln umtippen.
-      Ein Feld `default_location` an der Kategorie (in den Einstellungen
-      editierbar, wie die Haltbarkeiten) würde das für den Großteil eines
-      Einkaufs erledigen — Tiefkühl → Gefrier, Konserven → Vorrat. Kostet eine
-      Migration und eine Spalte in den Einstellungen. **Bewusst zurückgestellt,
-      bis ein echter Bon zeigt, wie oft man wirklich umtippt** — bei einem
-      Kühlschrank-lastigen Einkauf wären es zwei Taps und die Sache wäre es
-      nicht wert.
+- [x] **Standardort je Kategorie.** Gelöst, aber kleiner als geplant: nicht als
+      Spalte `default_location` mit Migration und dritter Spalte in den
+      Einstellungen, sondern als Konstante `defaultLocationFor()` in
+      `domain.ts`. Tiefkühl → Gefrier, Konserven/Trockenvorrat/Gewürze/
+      Süßes/Getränke/Backwaren → Vorrat, alles andere → Kühlschrank wie bisher.
+      Der Prüf-Screen setzt damit den Ort aus der Kategorie, die das Modell
+      ohnehin schon wählt. Falsch liegt die Tabelle nur bei Randfällen
+      (Kartoffeln, angebrochener Saft) — und die kosten denselben einen Tap,
+      den man ohne Tabelle bei jeder Zeile hätte. Editierbar zu machen wäre
+      Aufwand für eine Einstellung, die man einmal im Leben anfasst.
+- [ ] **Große Produkt- und Alias-Datenbasis vorab einlesen — verworfen, bis
+      etwas dafür spricht.** Der Gedanke: 100–300 gängige deutsche Artikel mit
+      Kategorie, MHD und Bon-Bezeichnung mitliefern, statt sie aus echten Bons
+      zu lernen. Durchgerechnet bleibt davon wenig übrig:
+      _Kategorie beim ersten Bon_ — schon gelöst, das Modell wählt aus den
+      Kategorien, die es in der Datenbank wirklich gibt (M5).
+      _MHD-Defaults_ — die 15 Kategorien decken das ab; „Milch 7 statt
+      Milchprodukte 10" ist ein Tag Unterschied und in den Einstellungen in
+      einer Minute nachgezogen.
+      _Tokens_ — spart nichts, siehe den Alias-Punkt weiter oben: das Foto muss
+      so oder so ganz gelesen werden.
+      _Vorgeratene Aliase sind sogar schädlich._ Ein Alias-Treffer wird
+      geglaubt: er ersetzt den Namensvorschlag des Modells, setzt `productId`
+      und gilt im Prüf-Screen als „bekannt". Ein geratener Eintrag würde also
+      still und selbstbewusst falsch zuordnen — während gelernte Aliase per
+      Konstruktion stimmen, weil sie aus einer bestätigten Zeile stammen.
+      _Ein Katalog leerer Produkte_ verstopft außerdem die Suche im
+      Hinzufügen-Screen und lässt „neu anlegen" nie erscheinen.
+      Übrig blieb genau die eine Tabelle, die man vorab wissen kann und die
+      nicht teuer falsch liegen kann: Kategorie → Standardort, siehe oben.
+      Wieder aufmachen, wenn nach zehn echten Bons dieselben Bezeichnungen
+      immer noch danebenliegen — dann aber gezielt für die Läden, in denen
+      wirklich eingekauft wird.
 - [ ] **Einkaufsliste aus der Undo-Leiste.** Wer etwas aufbraucht, weiß in
       genau diesem Moment, dass es fehlt — und genau dann steht die
       Undo-Leiste schon da. Ein zweiter Knopf „+ Einkaufsliste" daneben kostet
@@ -359,6 +387,27 @@ klar ist, ob es im Alltag stört.
       schiefer, geknickter Bonschrift hält, zeigt erst der Alltag — falls
       nicht, ist `thinking: adaptive` in `receipt.ts` der erste Hebel, vor
       jedem Prompt-Basteln.
+- [x] **Gebinde wurden als eine Packung gezählt.** Der erste echte Bon las
+      „BIO EIER 10ER" als 1 Pck. Formal richtig — `unit` ist die Zähleinheit —,
+      im Kühlschrank falsch: man nimmt ein Ei heraus, nicht einen Karton, und
+      „1 Pck" beantwortet die einzige Frage nicht, die man dort hat. Der
+      Prompt zählt jetzt den Inhalt, wo der Inhalt einzeln verbraucht wird
+      (Eier, Joghurtbecher, Brötchen, Flaschen); Gewicht einer einzelnen
+      Packung („MEHL 1KG") bleibt 1 Pck. An einem synthetischen Bon mit echtem
+      Modellaufruf gegengeprüft: 10 Eier, 4 Joghurt, 6 Brötchen, aber 1 Mehl
+      und 412 g lose Tomaten.
+- [x] **Balken auch für Zählbares.** Fünf von zehn Eiern sind eben halb. Dafür
+      brauchte es eine Bezugsgröße: neue Spalte `stock_item.initial_quantity`,
+      per Migration mit der aktuellen Menge nachgefüllt. Bewusst am Posten und
+      nicht aus dem letzten Kauf desselben Produkts abgeleitet — der letzte
+      Kauf kann eine andere Gebindegröße gewesen sein, dann zeigte der Balken
+      Unsinn. Der Balken benutzt dieselben vier Stufen wie lose Ware: vor dem
+      Kühlschrank ist es dieselbe Frage, also darf es nicht zwei Zeichen dafür
+      geben. Er erscheint erst, wenn etwas entnommen wurde (ein immer voller
+      Balken sagt nichts), fällt nie auf null Segmente, solange noch ein Stück
+      da ist, und bleibt bei Einzelstücken weg. Entnehmen lässt die Startmenge
+      stehen, Nachlegen darüber hinaus hebt sie an, und die Menge im Sheet
+      setzt sie neu — dort korrigiert man den Kauf, nicht die Entnahme.
 - [ ] **Marker für geschätzte MHDs entfernt.** Das `?` stand in fast jeder
       Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
       im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
