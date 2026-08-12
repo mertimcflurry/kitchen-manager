@@ -165,9 +165,10 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 **Stand 2026-08-12:** M0–M7 stehen im Code, `check`/`lint`/`test`/`build`
 laufen sauber (154 Tests). Offen ist überall nur noch das Gegenprüfen am
-Handy — die Punkte stehen bei den jeweiligen Meilensteinen. Als Nächstes
-sinnvoll: **M8 (Rezeptvorschlag)** oder **M9 (Betrieb im Container)**; M9 hat
-den Aufräumjob für Bon-Bilder als offene Zutat (§4).
+Handy — die Punkte stehen bei den jeweiligen Meilensteinen. **M8 ist geplant,
+aber nicht gebaut**: der Abschnitt unten ist die Vorlage für die
+Umsetzungsrunde. Danach oder parallel **M9 (Betrieb im Container)**, mit dem
+Aufräumjob für Bon-Bilder als offener Zutat (§4).
 
 ### M0 — Kontext und Repo ✅
 
@@ -283,11 +284,125 @@ den Aufräumjob für Bon-Bilder als offene Zutat (§4).
       Erledigt-Block unten stört, ob das Eingabefeld unter der Bottom-Nav
       erreichbar bleibt, wenn die Tastatur offen ist
 
-### M8 — Rezeptvorschlag
+### M8 — Rezeptvorschlag (geplant, noch nicht gebaut)
 
-- [ ] „Was koche ich?" mit Bestand als Kontext
-- [ ] Ablaufendes bevorzugen
-- [ ] Verbrauchte Zutaten direkt abbuchen können
+`/kochen` ist eine Platzhalterseite, die Nav-Kachel steht seit M1. Der Plan
+unten ist entschieden, nicht offen — eine Umsetzungsrunde (ui-ux, backend-data)
+kann ihn abarbeiten, ohne die Abwägungen zu wiederholen.
+
+- [ ] Ein Knopf, ein Vorschlag, Ablaufendes bevorzugt
+- [ ] Portionen 1 / 2 / 4 vorwählbar
+- [ ] Fehlende Zutaten sichtbar, mit einem Tap auf die Einkaufsliste
+- [ ] „Gekocht" bucht ab, was sich abbuchen lässt
+- [ ] **Am Handy gegenprüfen**: Wartezeit erträglich? Ist der Vorschlag am
+      Dienstagabend wirklich kochbar oder klingt er nur gut?
+
+**Dateien.** `src/lib/server/ai/recipe.ts` (der Aufruf, mit `$env`) und
+`recipe-parse.ts` (Schema, Prompt, Prüfung der Antwort) — dieselbe Teilung wie
+beim Bon und aus demselben Grund: `$env` löst in Tests nicht auf, und der
+prüfbare Teil ist genau der, in dem Fehler wehtun. Die Fehlerübersetzung
+`toUserError` aus `receipt.ts` zieht vorher nach `ai/errors.ts` um; sie bildet
+SDK-Fehler auf deutsche Sätze ab und gilt für beide Aufrufe unverändert — eine
+zweite Kopie liefe auseinander.
+
+**Modell und Aufruf.** `claude-opus-5`, eigene Konstante, überschreibbar über
+ein neues `ANTHROPIC_RECIPE_MODEL`. `ANTHROPIC_MODEL` bleibt Sonnet 5 für den
+Bon; `.env.example` behauptet derzeit, die eine Variable gelte für beides, das
+ist mitzuziehen (ebenso die Zeile in `CLAUDE.md`). Anders als beim Bon wird
+Thinking **nicht** abgeschaltet: „was geht aus diesen 23 Sachen, bevorzugt mit
+dem, was Freitag abläuft" ist ein Randbedingungsproblem, kein Abtippen. Auf
+Opus 5 denkt das Modell ohnehin standardmäßig — `thinking` bleibt also einfach
+weg —, dafür teilen sich Denken und Text dasselbe `max_tokens`: mit 4000 statt
+knapp bemessen, sonst bricht das Rezept mitten im dritten Schritt ab.
+`output_config.effort: 'medium'` als Startpunkt, `low` ist einen Versuch wert.
+`stop_reason === 'refusal'` wird geprüft wie beim Bon. Kein Prompt-Caching: der
+Bestand ändert sich bei jeder Mengenänderung, und der Prompt liegt unter der
+Mindestgröße. Kosten grob 1–2 ct pro Vorschlag, bei ein paar Aufrufen die Woche.
+
+**Structured Outputs**, wie beim Bon — Freitext zu zerlegen wäre die eine
+Fehlerquelle, die man geschenkt bekommt:
+
+```
+title · minutes · portions
+ingredients[]: name · amount_text („250 g") · source · stock_item_id · amount_base
+steps[]: kurze Sätze
+```
+
+`source` ist `stock` | `staple` | `missing`. Drei Zustände statt eines
+`have`-Flags, weil Salz und Öl weder aus dem Bestand kommen noch fehlen — ohne
+die mittlere Stufe landet „Salz" auf der Einkaufsliste und macht die einzige
+Liste unbrauchbar, die kurz bleiben muss. `stock_item_id` zeigt auf die Zeile,
+aus der die Zutat kommt (0 sonst); `amount_base` ist die Menge in der Einheit
+dieses Postens und dient nur dem Abbuchen, angezeigt wird `amount_text`.
+
+**Prompt.** System: genau ein Gericht, deutsch, alltagstauglich; der Bestand
+hat Vorrang; höchstens zwei fehlende Zutaten und die müssen in jedem Supermarkt
+stehen; kurze Schritte, im Stehen lesbar; keine Nährwerte (§5). Nutzerteil: der
+Bestand als Zeilen, nicht als JSON — `#42 Hackfleisch · 400 g · Kühlschrank ·
+läuft morgen ab`, `#17 Milch · 1 Pck · Kühlschrank · 8 Tage · ungeöffnet` —
+dazu die Portionenzahl und, beim Nachschlag, der abgelehnte Titel als „nicht
+schon wieder". Die Tage bis zum MHD stehen ausgeschrieben da, damit
+„Ablaufendes bevorzugen" eine Zahl im Prompt ist und keine Bitte.
+
+**Mengen — die Packungsgröße bleibt weg.** Vom Bon kommt „1 Pck Milch", ein
+Rezept will „200 ml". Der Reflex wäre ein Feld „Inhalt je Packung" am Produkt.
+Durchgerechnet trägt es nicht: Lose Ware (g/ml) liegt schon exakt vor, und was
+einzeln verbraucht wird, zählt seit M6 in Stück (10 Eier, 4 Joghurt) — beides
+sind bereits Rezepteinheiten. Übrig bleibt genau der Fall Mehl/Reis/Öl/Milch,
+und dort ist die Zahl für die Entscheidung irrelevant: eine ungeöffnete Packung
+reicht für ein bis zwei Portionen immer. Für die Anzeige braucht man sie auch
+nicht — das Rezept schreibt „250 g Mehl", weil das die übliche Sprache ist und
+eine Waage danebensteht, nicht „ca. ⅓ Packung". Und das Wissen, dass eine
+Packung Milch etwa ein Liter ist, hat das Modell ohnehin; der Produktname trägt
+es. Wir bräuchten die Zahl nur in einer `WHERE`-Klausel, und die gibt es nicht.
+Dagegen stünde: eine Tastaturabfrage bei jedem neuen Produkt (genau das
+Formular-Ping-Pong aus `CLAUDE.md`) oder eine Modellschätzung beim Bon-Import
+samt Spalte, Migration, NULL-Fallback und Korrekturweg im Detail-Sheet — für
+Daten, die dasselbe Modell beim Rezept ohne Speicher raten kann. **Entschieden:
+kein Feld.** Der Prompt sagt stattdessen, dass „1 Pck" eine ungeöffnete Packung
+unbekannten Inhalts ist und normale Packungsgrößen anzunehmen sind.
+
+**Abbuchen.** Ein Knopf unter dem Rezept, „Gekocht", ein Tap, danach die
+gewohnte Undo-Leiste — kein Abhaken je Zutat. Wer den Topf abstellt, tippt sich
+nicht durch fünf Zeilen, und wenn es nicht in einem Tap geht, passiert es gar
+nicht und der Bestand driftet. Abgezogen wird nach der Einheit des Postens, nicht
+nach der Rezepteinheit: g/ml um `amount_base`, Stück ganzzahlig, beides gegen
+den Restbestand geclamped. **Packungen bleiben stehen.** Ehrlich wäre dort
+„Öffnen", aber das legt eine neue Zeile an, und ein Sammel-Undo, das Zeilen
+wieder einsammelt, ist mehr Maschinerie als der Fall wert — das Öffnen sitzt
+weiterhin einen Tap entfernt im Detail-Sheet. Der Undo-Schnappschuss ist damit
+eine Liste `{id, quantity}` und eine Restore-Schleife.
+
+**Portionen.** Segmentierte Schalter **1 / 2 / 4** über dem großen Knopf, in
+derselben Sprache wie die Ort-Tabs und die vier Füllstufen — ein Tap, kein
+Regler, keine Tastatur. Ein-Personen-Haushalt heißt Vorauswahl 1; „mal für
+zwei" ist damit ein Tap, Besuch einer. Drei fehlt bewusst: man nimmt vier und
+hat Reste. Die Wahl steht in der URL (`?portionen=2`), wie der Ort im Bestand —
+kein Store, überlebt Neuladen, der Zurück-Knopf tut das Erwartete. ui-ux darf
+auf 1 / 2 kürzen, wenn die dritte Kachel die Trefferflächen zu schmal macht.
+
+**Warten.** Opus mit Thinking braucht 10–20 Sekunden; ein Spinner sieht darin
+aus wie ein Hänger. Kein Streaming — dafür bräuchte es einen eigenen Endpunkt
+statt einer Form-Action, viel Aufwand für einen seltenen Screen. Stattdessen
+trägt die Wartezeit Inhalt: die zwei, drei dringendsten Posten stehen darunter,
+die kennt die Seite ohne Modell.
+
+**Angrenzendes — notiert, nicht entschieden.**
+
+- **„Anderer Vorschlag"** als zweiter Knopf: derselbe Aufruf, der abgelehnte
+  Titel wandert als „nicht schon wieder" in den Prompt. Ein Tap, eine Zeile
+  Prompt — und damit der Ersatz für einen Einstellungs-Screen für Vorlieben.
+- **Fehlendes auf die Einkaufsliste**: die `missing`-Zutaten als Chips, ein Tap
+  legt sie an. M7 kann Freitextposten, es braucht nichts Neues.
+- **Einstieg vom Ablauf-Screen**: dort sieht man „drei Sachen laufen morgen ab"
+  — das ist der Moment, in dem die Frage entsteht. Ein Knopf, der nach `/kochen`
+  springt und sofort losläuft, spart den Umweg über die Nav.
+- **Mehrere Vorschläge nebeneinander — eher nicht.** Drei Karten heißen
+  scrollen und vergleichen; wer fragt „was koche ich", will keine Auswahl,
+  sondern eine Antwort. „Anderer Vorschlag" kann dasselbe mit einer
+  Entscheidung weniger.
+- **Keine Rezept-Historie**, keine Sammlung — steht so in `CLAUDE.md` und §5,
+  hier nur bestätigt.
 
 ### M9 — Betrieb
 
@@ -350,10 +465,13 @@ klar ist, ob es im Alltag stört.
       alten sind zwei Posten mit verschiedenen Daten — richtig, aber die Liste
       wird länger. Alternative: eine gruppierte Zeile je Produkt mit
       aufklappbaren Chargen.
-- [ ] **Packungsgröße fehlt.** Wir zählen vier Packungen, wissen aber nicht,
-      dass jede ein Liter ist. Für M8 („was koche ich") ist der Unterschied
-      zwischen drei Litern und drei Bechern relevant. Wäre ein Feld am Produkt —
-      erst bauen, wenn der Rezeptvorschlag zeigt, dass es fehlt.
+- [x] **Packungsgröße fehlt — entschieden beim Planen von M8: kein Feld.** Die
+      Sorge war, dass „drei Liter" und „drei Becher" für ein Rezept dasselbe
+      aussehen. Sie tun es nicht: lose Ware liegt in g/ml vor, einzeln
+      Verbrauchtes zählt seit M6 in Stück, und der Rest (Mehl, Reis, Öl, Milch)
+      reicht bei einer ungeöffneten Packung für ein bis zwei Portionen so oder
+      so — die Zahl entscheidet nichts. Der Produktname trägt die Größenordnung,
+      und das Modell kennt sie. Volle Begründung samt Gegenrechnung bei M8.
 - [ ] **Standardmenge lernt aus dem letzten Kauf.** Kein eingestellter Wert,
       sondern der zuletzt verwendete. Offen: reicht das, oder braucht es doch
       eine feste Vorgabe je Produkt, die man einmal setzt?
@@ -447,6 +565,18 @@ klar ist, ob es im Alltag stört.
       da ist, und bleibt bei Einzelstücken weg. Entnehmen lässt die Startmenge
       stehen, Nachlegen darüber hinaus hebt sie an, und die Menge im Sheet
       setzt sie neu — dort korrigiert man den Kauf, nicht die Entnahme.
+- [ ] **Keine Vorlieben, keine Ausschlüsse für den Rezeptvorschlag.** Es gibt
+      keine Tabelle dafür und beim Planen von M8 kam auch keine dazu. Ein
+      Ein-Personen-Haushalt, der jeden Vorschlag ohnehin sieht, bevor er kocht,
+      braucht kein Diätprofil — „gefällt mir nicht" beantwortet ein Tap auf
+      „anderer Vorschlag", und das ist ein Screen weniger als eine Liste von
+      Abneigungen, die gepflegt werden will. Wieder aufmachen, falls dieselbe
+      ungeliebte Zutat dreimal hintereinander vorgeschlagen wird.
+- [ ] **Das Rezept überlebt keinen Seitenwechsel.** Es lebt im Ergebnis der
+      Form-Action; wer während des Kochens auf „Bestand" tippt, verliert es.
+      Bewusst so für die erste Fassung — eine Sammlung ist ausgeschlossen (§5).
+      Falls es im Alltag stört, ist die kleinste Reparatur _ein_ gemerktes
+      Rezept als JSON, keine Tabelle mit Verlauf.
 - [ ] **Marker für geschätzte MHDs entfernt.** Das `?` stand in fast jeder
       Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
       im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
