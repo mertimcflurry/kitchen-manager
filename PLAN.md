@@ -143,7 +143,7 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 - [x] **Bon prüfen** — Zeilen als Karten, Unsicheres hervorgehoben,
       „Alle übernehmen" als Primäraktion, Korrigieren als Ausnahme.
 - [ ] **Bald schlecht** — nach Dringlichkeit, mit „aufgebraucht"-Geste.
-- [ ] **Einkaufsliste** — manuell plus Vorschläge, abhaken mit großem Ziel.
+- [x] **Einkaufsliste** — manuell plus Vorschläge, abhaken mit großem Ziel.
 - [ ] **Was koche ich?** — ein Button, Vorschlag aus dem Bestand,
       Ablaufendes bevorzugt.
 - [ ] **Einstellungen** — Kategorien und ihre MHD-Defaults, direkt editierbar.
@@ -255,10 +255,27 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### M7 — Auswertung und Einkaufsliste
 
-- [ ] Kaufhäufigkeit je Produkt
-- [ ] Typische Verbrauchsdauer aus `purchased_at` → `consumed_at`
-- [ ] Vorschläge daraus ableiten
-- [ ] Einkaufsliste mit Abhaken
+- [x] Einkaufsliste mit Abhaken. Die ganze Zeile ist das Ziel, nicht ein
+      Kästchen daneben — im Laden tippt man einhändig und im Gehen.
+      Abgehaktes wird **nicht gelöscht**, sondern rutscht in einen stillen
+      Block darunter: das ist das Undo für den Fehlgriff im Regal, ohne
+      Snackbar, ohne Timer, ohne Dialog. „Wegräumen" löscht den Block.
+- [x] Vorschläge: mindestens zweimal gekauft **und** gerade kein offener
+      Posten da, zuletzt Aufgebrauchtes vorn. Als Chips, ein Tap.
+- [x] **Der Bon hakt ab, was im Wagen lag.** Beim Bestätigen eines Bons werden
+      passende Listenposten erledigt — über die Produkt-ID und über den
+      Freitext, den man aufgeschrieben hat, bevor es das Produkt gab
+      („Zahnpasta"). Kostet null Taps und ist über den Erledigt-Block
+      sichtbar und umkehrbar.
+- [ ] ~~Kaufhäufigkeit als eigene Auswertung~~ — steckt in den Vorschlägen.
+      Eine Seite mit Zahlen wäre eine Zahl, die niemand antippt.
+- [ ] ~~Typische Verbrauchsdauer aus `purchased_at` → `consumed_at`~~ —
+      **verworfen für den Vorschlag**: sie schlüge Dinge vor, die noch da
+      sind, und ein Vorschlag, den man wegwischen muss, kostet mehr als einer,
+      der fehlt. Die Daten liegen weiter vor, falls M8 sie braucht.
+- [ ] **Am Handy gegenprüfen**: Trefferfläche der Zeilen im Gehen, ob der
+      Erledigt-Block unten stört, ob das Eingabefeld unter der Bottom-Nav
+      erreichbar bleibt, wenn die Tastatur offen ist
 
 ### M8 — Rezeptvorschlag
 
@@ -376,12 +393,28 @@ klar ist, ob es im Alltag stört.
       Wieder aufmachen, wenn nach zehn echten Bons dieselben Bezeichnungen
       immer noch danebenliegen — dann aber gezielt für die Läden, in denen
       wirklich eingekauft wird.
-- [ ] **Einkaufsliste aus der Undo-Leiste.** Wer etwas aufbraucht, weiß in
-      genau diesem Moment, dass es fehlt — und genau dann steht die
-      Undo-Leiste schon da. Ein zweiter Knopf „+ Einkaufsliste" daneben kostet
-      keinen Screen, keine Einstellung und keinen Umweg, sondern einen Tap im
-      richtigen Augenblick. Wartet auf M7, weil eine Liste, die man befüllen
-      aber nirgends ansehen kann, schlimmer ist als keine.
+- [x] **Einkaufsliste aus der Undo-Leiste — nach M7 verworfen.** Der Gedanke
+      war: wer etwas aufbraucht, weiß in genau dem Moment, dass es fehlt, und
+      die Undo-Leiste steht ohnehin schon da. Mit den Vorschlägen ist der
+      Moment aber schon abgedeckt: was man mindestens zweimal gekauft hat und
+      gerade aufgebraucht hat, steht beim nächsten Blick auf „Einkauf" als
+      Chip da — ohne Knopf, ohne Tap. Übrig bliebe der Erstkauf, also der
+      seltene Fall. Dem stünde gegenüber: ein zweiter Knopf direkt neben
+      „Rückgängig", auf 360 px Breite, in einer Leiste, die nach sechs
+      Sekunden weg ist. Ein Fehlgriff dort trifft die Undo-Aktion — das ist
+      der teuerste Nachbar, den ein Knopf haben kann.
+- [ ] **Kein Abzeichen an der Einkauf-Kachel.** Das Abzeichen an „Ablauf"
+      beantwortet eine Frage, die man sonst nicht sieht („brennt was?"). Wie
+      viele Posten auf der Einkaufsliste stehen, weiß man dagegen — man hat
+      sie selbst draufgesetzt. Eine Zahl, die nichts auslöst, ist Zierde.
+      Wieder aufmachen, falls sich zeigt, dass man die Liste im Laden
+      schlicht vergisst.
+- [ ] **Einkaufsliste ohne Sortierung nach Ladenweg.** Die Posten stehen in
+      der Reihenfolge, in der man an sie gedacht hat. Nach Kategorie zu
+      gruppieren („Obst zuerst, dann Kühlregal") wäre der nächste naheliegende
+      Schritt — aber die Reihenfolge im Laden hängt am Laden, nicht an der
+      Kategorie, und Freitextposten hätten gar keine. Erst bauen, wenn ein
+      echter Einkauf zeigt, dass man zurückläuft.
 - [ ] **Thinking beim Bon-Aufruf ist aus.** Spart Zeit und Geld, und an einem
       synthetischen Bon war die Trefferquote makellos. Ob das an echter,
       schiefer, geknickter Bonschrift hält, zeigt erst der Alltag — falls
