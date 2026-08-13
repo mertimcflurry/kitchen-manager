@@ -520,9 +520,12 @@ Angenommene Defaults, bis widersprochen wird:
       seit M5 unter `data/receipts/`, also im Bind-Mount neben der Datenbank;
       der Aufräumjob läuft jetzt über `hooks.server.ts`, siehe M9.
 - [ ] **Orte** — feste Liste Kühlschrank/Gefrier/Vorrat, keine freien Orte.
-- [ ] **`~/projects/README.md`** — Vermerk nachtragen, dass dieses Projekt vom
-      dokumentierten Python-Standard-Stack abweicht (noch nicht gemacht,
-      liegt außerhalb dieses Repos).
+- [x] **`~/projects/README.md`** — der Stack-Abweichungs-Vermerk stand dort
+      schon (Abschnitt „Abweichungen"), unklar seit wann. Am 2026-08-13 dafür
+      den Zugriff-Abschnitt nachgezogen: `tailscale serve` ist für
+      `kitchen-manager` jetzt eingerichtet und hat den Standard-HTTPS-Port
+      (443) belegt — ein künftiges Projekt mit eigenem HTTPS-/PWA-Bedarf
+      braucht einen eigenen `--https=<port>`.
 - [ ] **Preise vom Bon** — werden gespeichert, aber vorerst nicht ausgewertet.
       Preisverlauf je Produkt wäre reizvoll, ist aber Scope-Creep.
 
