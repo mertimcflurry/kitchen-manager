@@ -103,6 +103,17 @@
 		{/if}
 	</div>
 {:else}
+	<!-- Direkteinstieg statt Umweg über die Nav: „was läuft ab" ist genau der
+	     Moment, in dem die Frage „was koche ich damit" entsteht. `?los=1`
+	     löst den Vorschlag auf `/kochen` sofort aus, kein zweiter Tap dort. -->
+	<a
+		href={resolve('/kochen?los=1')}
+		class="mb-5 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-base
+			font-medium text-white shadow-lg transition active:scale-[0.99] dark:bg-emerald-500"
+	>
+		🍳 Rezept daraus vorschlagen
+	</a>
+
 	{#each groups as group (group.key)}
 		<section class="mb-5">
 			<h2 class="mb-2 flex items-baseline gap-2">

@@ -414,9 +414,14 @@ die kennt die Seite ohne Modell.
   Prompt — und damit der Ersatz für einen Einstellungs-Screen für Vorlieben.
 - **Fehlendes auf die Einkaufsliste**: die `missing`-Zutaten als Chips, ein Tap
   legt sie an. M7 kann Freitextposten, es braucht nichts Neues.
-- **Einstieg vom Ablauf-Screen**: dort sieht man „drei Sachen laufen morgen ab"
-  — das ist der Moment, in dem die Frage entsteht. Ein Knopf, der nach `/kochen`
-  springt und sofort losläuft, spart den Umweg über die Nav.
+- [x] **Einstieg vom Ablauf-Screen — umgesetzt 2026-08-13.** Dort sieht man
+      „drei Sachen laufen morgen ab" — das ist der Moment, in dem die Frage
+      entsteht. Ein Knopf auf `/ablauf` (nur wenn dort etwas steht) springt zu
+      `/kochen?los=1`; ein `$effect` dort löst den ersten Vorschlag beim Laden
+      selbst aus, kein zweiter Tap. Kein extra Kontext nötig — der Prompt
+      bevorzugt Ablaufendes ohnehin über den ganzen Bestand, unabhängig davon,
+      von wo man kam. `autoTriggered` verhindert eine Wiederholung, falls die
+      Anfrage fehlschlägt.
 - **Mehrere Vorschläge nebeneinander — eher nicht.** Drei Karten heißen
   scrollen und vergleichen; wer fragt „was koche ich", will keine Auswahl,
   sondern eine Antwort. „Anderer Vorschlag" kann dasselbe mit einer

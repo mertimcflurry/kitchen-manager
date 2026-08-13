@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Snackbar from '$lib/components/Snackbar.svelte';
 	import { formatDaysUntil } from '$lib/date';
@@ -51,6 +52,28 @@
 	 * Reihe statt einer dritten Option in der Herzhaft/Süß-Zeile.
 	 */
 	let diet = $state<'vegetarisch' | 'vegan' | null>(null);
+
+	let formEl: HTMLFormElement | undefined = $state();
+
+	/**
+	 * Direkteinstieg von „Bald schlecht": `?los=1` löst den ersten Vorschlag
+	 * sofort aus, ohne dass man hier noch einmal auf den Knopf tippen muss.
+	 * `autoTriggered` verhindert eine Endlosschleife, falls die Anfrage
+	 * fehlschlägt — `busy` und `recipe` werden dann wieder frei, das Formular
+	 * darf sich beim nächsten Effect-Lauf aber nicht selbst noch einmal abschicken.
+	 */
+	let autoTriggered = $state(false);
+	$effect(() => {
+		if (
+			!autoTriggered &&
+			page.url.searchParams.get('los') === '1' &&
+			!recipe &&
+			data.urgent.length > 0
+		) {
+			autoTriggered = true;
+			formEl?.requestSubmit();
+		}
+	});
 
 	const stockIngredients = $derived(
 		(recipe?.ingredients ?? [])
@@ -379,6 +402,7 @@
 	method="POST"
 	action="?/vorschlag"
 	use:enhance={suggest}
+	bind:this={formEl}
 	class="fixed inset-x-0 z-30 mx-auto flex max-w-lg gap-2 px-4"
 	style="bottom: var(--lane-fab)"
 >
