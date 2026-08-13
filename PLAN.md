@@ -164,9 +164,12 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 ## 3. Meilensteine
 
 **Stand 2026-08-13:** M0–M9 stehen im Code, `check`/`lint`/`test`/`build`
-laufen sauber (232 Tests), der Container läuft probeweise auf dem Pi. Offen
-ist überall nur noch das Gegenprüfen am Handy — die Punkte stehen bei den
-jeweiligen Meilensteinen. Als Nächstes **M10 (PWA)**.
+laufen sauber (232 Tests), der Container läuft probeweise auf dem Pi. **M10
+zur Hälfte**: Manifest, Icons und Vollbild-Start stehen, bewusst ohne Service
+Worker (§ dort). `tailscale serve` für HTTPS hängt an einer Freischaltung in
+der Tailscale-Admin-Konsole, die nur im Browser geht. Sonst ist überall nur
+noch das Gegenprüfen am Handy offen — die Punkte stehen bei den jeweiligen
+Meilensteinen.
 
 ### M0 — Kontext und Repo ✅
 
@@ -464,9 +467,27 @@ die kennt die Seite ohne Modell.
 
 ### M10 — PWA
 
-- [ ] `tailscale serve` für HTTPS einrichten (Voraussetzung für Service Worker)
-- [ ] Manifest, Icons, „Zum Homescreen"
-- [ ] Offline-Ansicht des Bestands
+- [x] **Manifest, Icons, „Zum Homescreen" — ohne Service Worker.** Entschieden:
+      die App läuft dauerhaft im Heimnetz über Tailscale, „offline vorm leeren
+      Kühlschrank" ist ein Randfall, kein Alltag — der Aufwand für einen
+      Service Worker lohnt sich dafür nicht. `static/manifest.json`
+      (`display: standalone`), dazu `apple-mobile-web-app-capable` und
+      `apple-touch-icon` in `app.html`, weil iOS das Manifest fürs Vollbild
+      ignoriert und eigene Meta-Tags will. Die vier Icon-Dateien erzeugt
+      `scripts/generate-icons.mjs` (reines `zlib`, kein ImageMagick/sharp auf
+      dem Pi) — ein einfacher Kühlschrank-Umriss, `any` in 192/512 und ein
+      eigenes `maskable` mit mehr Rand, damit Android/Chrome beim
+      Kreis-/Squircle-Zuschnitt nichts abschneidet.
+- [ ] **`tailscale serve` für HTTPS — blockiert, Nutzeraktion nötig.** „Serve
+      is not enabled on your tailnet"; Freischalten geht nur über die
+      Tailscale-Admin-Konsole im Browser, nicht per CLI/SSH. Ohne HTTPS zeigt
+      „Zum Home-Bildschirm" auf iOS trotzdem ein Icon und startet standalone
+      (das hängt nur an den Meta-Tags oben) — HTTPS wird erst mit einem
+      Service Worker zur Pflicht, und der ist ja gerade bewusst weggelassen.
+- [ ] **Offline-Ansicht des Bestands — zurückgestellt.** Siehe oben: ohne
+      Service Worker kein Sinn, und ohne Service Worker bleibt es dabei.
+      Wieder aufmachen, falls sich zeigt, dass ein Tailscale-Aussetzer im
+      Alltag wirklich stört.
 
 ---
 

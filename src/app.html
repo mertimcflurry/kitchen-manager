@@ -8,6 +8,15 @@
 		<meta name="theme-color" content="#064e3b" media="(prefers-color-scheme: dark)" />
 		<meta name="apple-mobile-web-app-title" content="Küche" />
 		<meta name="mobile-web-app-capable" content="yes" />
+		<!-- iOS ignoriert das Manifest fürs Vollbild — erst dieses Meta-Tag
+		     schaltet „Zum Home-Bildschirm" auf standalone statt auf einen Tab
+		     in Safari. status-bar-style „black-translucent" zieht die Seite
+		     unter die Statusleiste, dafür ist das safe-area-Padding aus
+		     layout.css schon da. -->
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.json" />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="tap">
