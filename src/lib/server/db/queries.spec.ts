@@ -17,6 +17,7 @@ import {
 	openOne,
 	undoConsume,
 	updateCategory,
+	updateProductCategory,
 	updateStockItem
 } from './queries';
 import { seedCategories, seedDevData } from './seed';
@@ -187,6 +188,55 @@ describe('findOrCreateProduct', () => {
 		const first = findOrCreateProduct(db, 'Tofu natur');
 		const second = findOrCreateProduct(db, '  TOFU NATUR  ');
 		expect(second).toBe(first);
+	});
+
+	it('rät ohne categoryName die Kategorie aus dem Namen', () => {
+		const id = findOrCreateProduct(db, 'Pfirsich');
+		const row = listStock(db).find((r) => r.productId === id);
+		// Neu angelegt, noch nicht eingelagert — über die Kategorien-Tabelle nachschauen.
+		const p = db.select().from(product).where(eq(product.id, id)).get()!;
+		const cat = db.select().from(category).where(eq(category.id, p.categoryId)).get()!;
+		expect(cat.name).toBe('Obst & Gemüse');
+		expect(row).toBeUndefined(); // nicht eingelagert, nur angelegt
+	});
+
+	it('landet ohne Treffer weiterhin in Sonstiges', () => {
+		const id = findOrCreateProduct(db, 'Erfundenes Zeug');
+		const p = db.select().from(product).where(eq(product.id, id)).get()!;
+		const cat = db.select().from(category).where(eq(category.id, p.categoryId)).get()!;
+		expect(cat.name).toBe('Sonstiges');
+	});
+
+	it('eine explizite categoryName sticht den Rateversuch', () => {
+		const id = findOrCreateProduct(db, 'Pfirsich Kompott', 'Konserven');
+		const p = db.select().from(product).where(eq(product.id, id)).get()!;
+		const cat = db.select().from(category).where(eq(category.id, p.categoryId)).get()!;
+		expect(cat.name).toBe('Konserven');
+	});
+});
+
+describe('updateProductCategory', () => {
+	it('sortiert ein Produkt in eine andere Kategorie um', () => {
+		const tofu = db.select().from(product).where(eq(product.name, 'Tofu natur')).get()!;
+		const konserven = db.select().from(category).where(eq(category.name, 'Konserven')).get()!;
+
+		updateProductCategory(db, tofu.id, konserven.id);
+
+		const after = db.select().from(product).where(eq(product.id, tofu.id)).get()!;
+		expect(after.categoryId).toBe(konserven.id);
+	});
+
+	it('wirkt sich auf alle Posten des Produkts aus, nicht nur einen', () => {
+		const tofu = db.select().from(product).where(eq(product.name, 'Tofu natur')).get()!;
+		const konserven = db.select().from(category).where(eq(category.name, 'Konserven')).get()!;
+		addStock(db, { productId: tofu.id, quantity: 1, location: 'fridge' });
+		addStock(db, { productId: tofu.id, quantity: 1, location: 'pantry' });
+
+		updateProductCategory(db, tofu.id, konserven.id);
+
+		const rows = listStock(db).filter((r) => r.productId === tofu.id);
+		expect(rows.length).toBeGreaterThan(0);
+		expect(rows.every((r) => r.categoryName === 'Konserven')).toBe(true);
 	});
 });
 

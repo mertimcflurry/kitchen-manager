@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { countByLocation, listStock } from '$lib/server/db/queries';
+import { countByLocation, listCategories, listStock } from '$lib/server/db/queries';
 import { parseLocation, stockActions } from '$lib/server/stock-actions';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -10,7 +10,9 @@ export const load: PageServerLoad = ({ url }) => {
 	return {
 		location: location ?? null,
 		items: listStock(db, location),
-		counts: countByLocation(db)
+		counts: countByLocation(db),
+		// Fürs Kategorie-Feld im Artikel-Detail-Sheet.
+		categories: listCategories(db)
 	};
 };
 

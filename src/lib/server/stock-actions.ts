@@ -15,6 +15,7 @@ import {
 	openOne,
 	setFillLevel,
 	undoConsume,
+	updateProductCategory,
 	updateStockItem
 } from '$lib/server/db/queries';
 
@@ -148,6 +149,23 @@ export const stockActions = {
 		}
 
 		updateStockItem(db, id, { location, bestBefore, quantity, unit });
+		return { ok: true };
+	},
+
+	/** Kategorie eines Produkts korrigieren — Fehltreffer von Rateversuch oder Bon-Modell. */
+	category: async ({ request }) => {
+		const data = await request.formData();
+		const productId = Number(data.get('productId'));
+		const categoryId = Number(data.get('categoryId'));
+		if (
+			!Number.isInteger(productId) ||
+			productId <= 0 ||
+			!Number.isInteger(categoryId) ||
+			categoryId <= 0
+		)
+			return fail(400, { message: 'Ungültig' });
+
+		updateProductCategory(db, productId, categoryId);
 		return { ok: true };
 	}
 } satisfies Actions;

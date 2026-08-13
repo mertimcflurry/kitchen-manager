@@ -179,8 +179,10 @@ docker compose down
 
 - Aufrufe **ausschließlich** in `src/lib/server/ai/`. Der Key darf nie ins
   Frontend, nicht in `PUBLIC_*`-Variablen und nicht in Logs.
-- Key aus `.env`: `ANTHROPIC_API_KEY`. Modell aus `ANTHROPIC_MODEL`,
-  Default `claude-sonnet-5`.
+- Key aus `.env`: `ANTHROPIC_API_KEY`. Modell für den Bon aus `ANTHROPIC_MODEL`,
+  Default `claude-sonnet-5`. Modell für den Rezeptvorschlag separat aus
+  `ANTHROPIC_RECIPE_MODEL`, Default `claude-opus-5` — ein Randbedingungsproblem
+  (was geht aus dem Bestand, bevorzugt mit Ablaufendem), kein Abtippen.
 - **Der Key gehört in `.env`, niemals in `.env.example`.** `.env` ist
   gitignoriert, `.env.example` ausdrücklich nicht — sie geht mit ins Repo.
   In `.env.example` steht nur ein leerer Platzhalter.

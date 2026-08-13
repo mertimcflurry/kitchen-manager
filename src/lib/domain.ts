@@ -52,6 +52,15 @@ export function isCountable(unit: Unit): boolean {
 	return unit === 'piece' || unit === 'pack';
 }
 
+/**
+ * Portionenwahl für den Rezeptvorschlag: ein Tap, kein Regler.
+ *
+ * Drei fehlt bewusst — wer für drei kocht, nimmt vier und hat Reste.
+ * Ein-Personen-Haushalt heißt Vorauswahl 1.
+ */
+export const RECIPE_PORTIONS = [1, 2, 4] as const;
+export type RecipePortions = (typeof RECIPE_PORTIONS)[number];
+
 /* ---------- Wohin etwas standardmäßig gehört ---------- */
 
 /**

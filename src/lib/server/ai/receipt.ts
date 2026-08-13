@@ -14,6 +14,7 @@ import {
 	RECEIPT_SYSTEM_PROMPT,
 	type ParsedReceipt
 } from './receipt-parse';
+import { AiError, toUserError } from './errors';
 
 /** Sonnet 5 liest Bilder bis 2576 px Kante — bei Bonschrift entscheidet das. */
 const DEFAULT_MODEL = 'claude-sonnet-5';
@@ -23,22 +24,8 @@ const REQUEST_TIMEOUT_MS = 120_000;
 
 export type ReceiptImage = { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' };
 
-/**
- * Ein Fehler, dessen Text man dem Nutzer zeigen kann.
- *
- * Die Unterscheidung ist nicht kosmetisch: „kein Guthaben" behebt man am
- * Rechner, „Zeitüberschreitung" durch nochmal antippen. Wer beides als
- * „Fehler beim Auswerten" sieht, probiert das Falsche.
- */
-export class ReceiptAiError extends Error {
-	constructor(
-		message: string,
-		readonly retryable: boolean
-	) {
-		super(message);
-		this.name = 'ReceiptAiError';
-	}
-}
+/** Alter Name, hier nur als Alias — die Fehlerklasse gilt jetzt für beide KI-Aufrufe. */
+export { AiError as ReceiptAiError };
 
 export type ReceiptAnalysis = {
 	receipt: ParsedReceipt;
@@ -49,40 +36,9 @@ export type ReceiptAnalysis = {
 function createClient(): Anthropic {
 	const apiKey = env.ANTHROPIC_API_KEY?.trim();
 	if (!apiKey) {
-		throw new ReceiptAiError('Kein API-Schlüssel hinterlegt (ANTHROPIC_API_KEY in .env).', false);
+		throw new AiError('Kein API-Schlüssel hinterlegt (ANTHROPIC_API_KEY in .env).', false);
 	}
 	return new Anthropic({ apiKey, timeout: REQUEST_TIMEOUT_MS, maxRetries: 1 });
-}
-
-/** Übersetzt SDK-Fehler in etwas, das vor dem Kühlschrank weiterhilft. */
-function toUserError(error: unknown): ReceiptAiError {
-	if (error instanceof ReceiptAiError) return error;
-
-	if (error instanceof Anthropic.AuthenticationError) {
-		return new ReceiptAiError('API-Schlüssel wird abgelehnt — bitte in .env prüfen.', false);
-	}
-	if (error instanceof Anthropic.RateLimitError) {
-		return new ReceiptAiError('Zu viele Anfragen. Gleich noch einmal versuchen.', true);
-	}
-	if (error instanceof Anthropic.APIConnectionTimeoutError) {
-		return new ReceiptAiError('Zeitüberschreitung beim Lesen. Noch einmal versuchen.', true);
-	}
-	if (error instanceof Anthropic.APIConnectionError) {
-		return new ReceiptAiError('Keine Verbindung zur API. Läuft das Netz?', true);
-	}
-	if (error instanceof Anthropic.BadRequestError) {
-		// Aufgebrauchtes Prepaid-Guthaben kommt als 400 mit Hinweis auf die
-		// Kontostand-Meldung — der häufigste Fall, der nicht am Bild liegt.
-		const message = String(error.message ?? '');
-		if (/credit balance|insufficient|billing/i.test(message)) {
-			return new ReceiptAiError('Kein Guthaben mehr auf dem API-Konto.', false);
-		}
-		return new ReceiptAiError('Die Anfrage wurde abgelehnt. Andere Aufnahme versuchen.', false);
-	}
-	if (error instanceof Anthropic.APIError) {
-		return new ReceiptAiError('Die API antwortet gerade nicht. Später noch einmal.', true);
-	}
-	return new ReceiptAiError('Beim Auswerten ist etwas schiefgegangen.', true);
 }
 
 /**
@@ -96,7 +52,7 @@ export async function analyzeReceipt(
 	images: ReceiptImage[],
 	categoryNames: string[]
 ): Promise<ReceiptAnalysis> {
-	if (images.length === 0) throw new ReceiptAiError('Keine Aufnahme dabei.', false);
+	if (images.length === 0) throw new AiError('Keine Aufnahme dabei.', false);
 
 	const client = createClient();
 	const model = env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
@@ -139,11 +95,11 @@ export async function analyzeReceipt(
 		});
 
 		if (response.stop_reason === 'refusal') {
-			throw new ReceiptAiError('Das Modell hat die Auswertung abgelehnt.', false);
+			throw new AiError('Das Modell hat die Auswertung abgelehnt.', false);
 		}
 
 		const text = response.content.find((block) => block.type === 'text')?.text ?? '';
-		if (text.trim() === '') throw new ReceiptAiError('Das Modell hat nichts zurückgegeben.', true);
+		if (text.trim() === '') throw new AiError('Das Modell hat nichts zurückgegeben.', true);
 
 		// Sichtbar machen, was ein Bon kostet — der Key steht hier nirgends drin.
 		console.log(
@@ -154,7 +110,7 @@ export async function analyzeReceipt(
 		try {
 			json = JSON.parse(text);
 		} catch {
-			throw new ReceiptAiError('Die Antwort war unlesbar. Noch einmal versuchen.', true);
+			throw new AiError('Die Antwort war unlesbar. Noch einmal versuchen.', true);
 		}
 
 		return { receipt: coerceReceipt(json, categoryNames), raw: text };

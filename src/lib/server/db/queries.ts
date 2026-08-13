@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import { daysUntil, estimateBestBefore, FRESHNESS_THRESHOLDS } from '../../date';
 import { isCountable } from '../../domain';
+import { guessCategoryName } from './category-guess';
 import type { Db, DbOrTx } from './client';
 import { category, product, stockItem, type FillLevel, type Location, type Unit } from './schema';
 
@@ -10,6 +11,7 @@ export type StockRow = {
 	productId: number;
 	name: string;
 	emoji: string;
+	categoryId: number;
 	categoryName: string;
 	quantity: number;
 	/** Womit der Posten angefangen hat — Bezugsgröße für den Balken bei Zählbarem. */
@@ -36,6 +38,7 @@ export function listStock(db: Db, location?: Location): StockRow[] {
 			productId: product.id,
 			name: product.name,
 			emoji: category.emoji,
+			categoryId: category.id,
 			categoryName: category.name,
 			quantity: stockItem.quantity,
 			initialQuantity: stockItem.initialQuantity,
@@ -249,6 +252,18 @@ export function updateStockItem(
 }
 
 /**
+ * Ordnet ein Produkt einer anderen Kategorie zu.
+ *
+ * Der Korrekturweg für einen falschen Rateversuch beim Anlegen (siehe
+ * `guessCategoryName`) oder eine vom Bon-Modell danebengetroffene Kategorie.
+ * Die Kategorie hängt am Produkt, nicht am Posten — betrifft also alle
+ * Chargen dieses Produkts, nicht nur die gerade geöffnete.
+ */
+export function updateProductCategory(db: Db, productId: number, categoryId: number): void {
+	db.update(product).set({ categoryId }).where(eq(product.id, productId)).run();
+}
+
+/**
  * Produkte nach Kaufhäufigkeit — die Vorlage für die Chips beim Hinzufügen.
  * Das meiste, was nachgetragen wird, wurde schon zwanzigmal gekauft.
  */
@@ -418,8 +433,10 @@ export function updateCategory(
 /**
  * Findet ein Produkt über seinen Namen oder legt es an.
  *
- * `categoryName` ist ein Vorschlag — vom Bon-Modell etwa. Passt er auf keine
- * vorhandene Kategorie, landet das Produkt in „Sonstiges", bis jemand es
+ * `categoryName` ist ein Vorschlag — vom Bon-Modell etwa. Ohne Vorgabe (der
+ * manuelle Pfad übers Hinzufügen-Formular hat kein Modell zur Hand) rät
+ * `guessCategoryName` aus dem Namen; passt weder Vorgabe noch Rateversuch auf
+ * eine vorhandene Kategorie, landet das Produkt in „Sonstiges", bis jemand es
  * einsortiert. Ein bereits vorhandenes Produkt wird **nicht** umsortiert:
  * eine von Hand gesetzte Kategorie wiegt schwerer als ein Vorschlag.
  */
@@ -432,8 +449,9 @@ export function findOrCreateProduct(db: DbOrTx, name: string, categoryName?: str
 		.get();
 	if (existing) return existing.id;
 
-	const suggested = categoryName
-		? db.select().from(category).where(eq(category.name, categoryName)).get()
+	const resolvedCategoryName = categoryName ?? guessCategoryName(trimmed);
+	const suggested = resolvedCategoryName
+		? db.select().from(category).where(eq(category.name, resolvedCategoryName)).get()
 		: undefined;
 	const target =
 		suggested ??

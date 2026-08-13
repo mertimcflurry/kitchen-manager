@@ -1,6 +1,6 @@
 import { daysUntil, EXPIRY_HORIZON_DAYS } from '$lib/date';
 import { db } from '$lib/server/db';
-import { listStock } from '$lib/server/db/queries';
+import { listCategories, listStock } from '$lib/server/db/queries';
 import { stockActions } from '$lib/server/stock-actions';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -18,7 +18,9 @@ export const load: PageServerLoad = () => {
 		// „Der Rest hält länger" ist die beruhigende Auskunft, wenn die Liste leer
 		// oder kurz ist — sonst wirkt der Screen kaputt statt entspannt.
 		laterCount: all.length - items.length,
-		horizonDays: EXPIRY_HORIZON_DAYS
+		horizonDays: EXPIRY_HORIZON_DAYS,
+		// Fürs Kategorie-Feld im Artikel-Detail-Sheet.
+		categories: listCategories(db)
 	};
 };
 

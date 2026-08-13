@@ -138,7 +138,12 @@
 {/if}
 
 {#if sheetItem}
-	<ItemSheet item={sheetItem} onClose={() => (sheetId = null)} onConsume={consume} />
+	<ItemSheet
+		item={sheetItem}
+		categories={data.categories}
+		onClose={() => (sheetId = null)}
+		onConsume={consume}
+	/>
 {/if}
 
 {#if undoState}

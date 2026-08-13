@@ -13,13 +13,21 @@ import type { ActionResult } from '@sveltejs/kit';
  * Action —, muss `invalidateAll` trotzdem laufen: sonst zeigt die Liste
  * weiter den optimistischen Stand, obwohl der Server nichts gespeichert hat,
  * und man glaubt, es sei erledigt.
+ *
+ * `action` ist normalerweise ein Name der eigenen Route (`consume`). Ein
+ * vollständiger Pfad (`/einkauf?/addText`) spricht die Action einer anderen
+ * Route an — so kommen fehlende Rezeptzutaten auf die Einkaufsliste, ohne dass
+ * `/kochen` eine zweite Kopie derselben Action bekommt.
  */
 export async function post(action: string, fields: Record<string, string>): Promise<ActionResult> {
 	const body = new FormData();
 	for (const [key, value] of Object.entries(fields)) body.append(key, value);
 
 	try {
-		const response = await fetch(`?/${action}`, { method: 'POST', body });
+		const response = await fetch(action.startsWith('/') ? action : `?/${action}`, {
+			method: 'POST',
+			body
+		});
 		const result: ActionResult = deserialize(await response.text());
 		if (result.type === 'success' || result.type === 'failure' || result.type === 'error') {
 			await invalidateAll();

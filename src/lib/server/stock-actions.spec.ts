@@ -3,7 +3,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb, type Db } from './db/client';
 import { seedCategories, seedDevData } from './db/seed';
-import { stockItem } from './db/schema';
+import { category, product, stockItem } from './db/schema';
 
 /**
  * `stock-actions.ts` importiert `db` aus `$lib/server/db` — dem Singleton, der
@@ -232,5 +232,27 @@ describe('update', () => {
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, milkId)).get()!;
 		expect(row.bestBefore).toEqual(new Date(2026, 11, 24));
+	});
+});
+
+describe('category', () => {
+	it('lehnt eine fehlende oder ungültige productId oder categoryId ab', async () => {
+		expect(await stockActions.category(event({}))).toMatchObject({ status: 400 });
+		expect(await stockActions.category(event({ productId: '-1', categoryId: '1' }))).toMatchObject({
+			status: 400
+		});
+	});
+
+	it('ordnet das Produkt der neuen Kategorie zu', async () => {
+		const item = db.select().from(stockItem).where(eq(stockItem.id, milkId)).get()!;
+		const konserven = db.select().from(category).where(eq(category.name, 'Konserven')).get()!;
+
+		const result = await stockActions.category(
+			event({ productId: String(item.productId), categoryId: String(konserven.id) })
+		);
+		expect(result).toEqual({ ok: true });
+
+		const updated = db.select().from(product).where(eq(product.id, item.productId)).get()!;
+		expect(updated.categoryId).toBe(konserven.id);
 	});
 });

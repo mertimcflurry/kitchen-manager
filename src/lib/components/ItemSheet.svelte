@@ -13,8 +13,14 @@
 	} from '$lib/domain';
 	import FillBar from './FillBar.svelte';
 
-	type Props = { item: StockRow; onClose: () => void; onConsume: (item: StockRow) => void };
-	let { item, onClose, onConsume }: Props = $props();
+	type CategoryOption = { id: number; name: string; emoji: string };
+	type Props = {
+		item: StockRow;
+		categories: CategoryOption[];
+		onClose: () => void;
+		onConsume: (item: StockRow) => void;
+	};
+	let { item, categories, onClose, onConsume }: Props = $props();
 
 	const isOpen = $derived(item.fillLevel !== null);
 	/** Mehrere verschlossene Einheiten: eine davon wird abgeteilt, nicht alle markiert. */
@@ -177,6 +183,29 @@
 					{LOCATION_LABELS[loc]}
 				</button>
 			{/each}
+		</form>
+	</section>
+
+	<section class="mb-6">
+		<h3 class="mb-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">Kategorie</h3>
+		<!-- Select statt Buttons wie bei Ort: fünfzehn Kategorien in einer
+		     Reihe wären keine Touch-Ziele mehr. Betrifft das ganze Produkt,
+		     nicht nur diesen Posten — Korrektur für einen falschen Rateversuch
+		     beim Anlegen oder ein danebengetroffenes Bon-Modell. -->
+		<form method="POST" action="?/category" use:enhance>
+			<input type="hidden" name="productId" value={item.productId} />
+			<select
+				name="categoryId"
+				value={item.categoryId}
+				onchange={saveOnChange}
+				aria-label="Kategorie"
+				class="min-h-12 w-full rounded-xl border-zinc-300 bg-white text-sm dark:border-zinc-700
+					dark:bg-zinc-800"
+			>
+				{#each categories as c (c.id)}
+					<option value={c.id}>{c.emoji} {c.name}</option>
+				{/each}
+			</select>
 		</form>
 	</section>
 

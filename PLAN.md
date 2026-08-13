@@ -163,12 +163,11 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ## 3. Meilensteine
 
-**Stand 2026-08-12:** M0–M7 stehen im Code, `check`/`lint`/`test`/`build`
-laufen sauber (154 Tests). Offen ist überall nur noch das Gegenprüfen am
-Handy — die Punkte stehen bei den jeweiligen Meilensteinen. **M8 ist geplant,
-aber nicht gebaut**: der Abschnitt unten ist die Vorlage für die
-Umsetzungsrunde. Danach oder parallel **M9 (Betrieb im Container)**, mit dem
-Aufräumjob für Bon-Bilder als offener Zutat (§4).
+**Stand 2026-08-13:** M0–M8 stehen im Code, `check`/`lint`/`test`/`build`
+laufen sauber (228 Tests). Offen ist überall nur noch das Gegenprüfen am
+Handy — die Punkte stehen bei den jeweiligen Meilensteinen. Als Nächstes
+**M9 (Betrieb im Container)**, mit dem Aufräumjob für Bon-Bilder als offener
+Zutat (§4).
 
 ### M0 — Kontext und Repo ✅
 
@@ -284,16 +283,37 @@ Aufräumjob für Bon-Bilder als offener Zutat (§4).
       Erledigt-Block unten stört, ob das Eingabefeld unter der Bottom-Nav
       erreichbar bleibt, wenn die Tastatur offen ist
 
-### M8 — Rezeptvorschlag (geplant, noch nicht gebaut)
+### M8 — Rezeptvorschlag ✅
 
-`/kochen` ist eine Platzhalterseite, die Nav-Kachel steht seit M1. Der Plan
-unten ist entschieden, nicht offen — eine Umsetzungsrunde (ui-ux, backend-data)
-kann ihn abarbeiten, ohne die Abwägungen zu wiederholen.
+`/kochen` war eine Platzhalterseite, die Nav-Kachel stand seit M1. Der Plan
+unten war entschieden, nicht offen, und wurde von einer Umsetzungsrunde
+(backend-data, dann ui-ux) so gebaut — die Abwägungen mussten nicht
+wiederholt werden.
 
-- [ ] Ein Knopf, ein Vorschlag, Ablaufendes bevorzugt
-- [ ] Portionen 1 / 2 / 4 vorwählbar
-- [ ] Fehlende Zutaten sichtbar, mit einem Tap auf die Einkaufsliste
-- [ ] „Gekocht" bucht ab, was sich abbuchen lässt
+- [x] Ein Knopf, ein Vorschlag, Ablaufendes bevorzugt
+- [x] Portionen 1 / 2 / 4 vorwählbar
+- [x] Fehlende Zutaten sichtbar, mit einem Tap auf die Einkaufsliste
+- [x] „Gekocht" bucht ab, was sich abbuchen lässt — inklusive Sonderfälle, die
+      erst der reviewer fand: angebrochene lose Ware wird gegen die
+      **Restmenge** abgebucht (nicht die Kaufmenge) und landet bei Rest 0 in
+      `consumedAt`; Packungen bleiben serverseitig hart stehen, egal was das
+      Modell an Menge vorschlägt; doppelt referenzierte Bestandsposten beim
+      Abbuchen und beim Undo korrekt zusammengefasst
+- [x] **Portionswechsel rechnet hoch, statt den Vorschlag zu verwerfen.** Beim
+      Testen fiel auf: ein Tap auf einen anderen Portionen-Reiter hat das
+      gerade geholte Rezept gelöscht, weil `recipe.portions` nicht mehr zur
+      URL passte. Jetzt rechnet `scaleRecipe` (`$lib/recipe-scale.ts`) Mengen
+      und `amountBase` mit dem Verhältnis hoch, kein neuer KI-Aufruf — „für 2"
+      ist für 1 mal 2, kein anderes Gericht. Packungen bleiben bei
+      `amountBase: 0` stehen, `amountText` wird nur skaliert, wenn eine Zahl
+      am Anfang steht („250 g" → „500 g"; „etwas Salz" bleibt, wie es ist).
+- [x] **Tendenz und Wunsch fließen jetzt in den Prompt.** Zwei Chips
+      (herzhaft/süß) plus ein Freitextfeld („Lasagne", „keine Nudeln") über
+      dem Portionen-Reiter, beides optional. Kein gespeicherter Zustand,
+      keine Tabelle — nur zwei zusätzliche Zeilen im Prompt
+      (`Tendenz:`/`Wunsch:`), genau wie der abgelehnte Titel beim „anderer
+      Vorschlag". Ändert nichts an der Entscheidung gegen ein Diätprofil
+      unten, siehe Nachtrag dort.
 - [ ] **Am Handy gegenprüfen**: Wartezeit erträglich? Ist der Vorschlag am
       Dienstagabend wirklich kochbar oder klingt er nur gut?
 
@@ -520,6 +540,19 @@ klar ist, ob es im Alltag stört.
       Wieder aufmachen, wenn nach zehn echten Bons dieselben Bezeichnungen
       immer noch danebenliegen — dann aber gezielt für die Läden, in denen
       wirklich eingekauft wird.
+- [x] **Manuell angelegte Produkte landeten immer in „Sonstiges".** Anders als
+      beim Bon-Import (M5) liefert „Schnell hinzufügen" kein Modell, das die
+      Kategorie mitgibt — `findOrCreateProduct` fiel ohne `categoryName` direkt
+      auf „Sonstiges" zurück. „Pfirsich" eintippen ergab 30 Tage MHD statt der
+      7 von Obst & Gemüse. Zwei bewusst kleine Bausteine, kein Widerspruch zum
+      oben verworfenen großen Produktkatalog: `guessCategoryName`
+      (`category-guess.ts`) ist eine reine Stichwortliste je Kategorie
+      (~10–50 Wörter, keine MHDs, keine Aliase, keine Pflege durch Bon-Daten)
+      als Fallback nur dort, wo `findOrCreateProduct` sonst blind raten würde —
+      und weil eine Heuristik nie vollständig sein wird, ist die Kategorie
+      jetzt im Artikel-Detail-Sheet direkt änderbar (Select, wirkt aufs ganze
+      Produkt, nicht nur den einen Posten). Ein Fehltreffer ist damit ein Tap
+      entfernt korrigierbar statt für immer falsch.
 - [x] **Einkaufsliste aus der Undo-Leiste — nach M7 verworfen.** Der Gedanke
       war: wer etwas aufbraucht, weiß in genau dem Moment, dass es fehlt, und
       die Undo-Leiste steht ohnehin schon da. Mit den Vorschlägen ist der
@@ -579,6 +612,19 @@ klar ist, ob es im Alltag stört.
       schon im Kühlschrank. Interessanter wäre es erst bei M7, für Vorschläge
       zu Dingen, die noch nicht da sind (Einkaufsliste) — dort aber noch nicht
       geplant, nur als möglicher späterer Anknüpfungspunkt vermerkt.
+      Nachtrag 2026-08-12: Nutzer wollte beim Testen doch eine Tendenz vor der
+      Anfrage setzen können, nicht erst danach über „anderer Vorschlag"
+      korrigieren. Umgesetzt als zwei Chips (herzhaft/süß) plus Freitext,
+      **nicht** gespeichert — jeder Aufruf startet wieder leer. Das ist kein
+      Diätprofil und keine Ausschlussliste, sondern derselbe Mechanismus wie
+      der abgelehnte Titel, nur proaktiv statt reaktiv. Die Begründung oben
+      bleibt richtig: es gibt weiterhin keine Tabelle und nichts, das gepflegt
+      werden muss.
+      Nachtrag 2026-08-13: zweite, unabhängige Chip-Reihe „Vegetarisch"/„Vegan"
+      dazu, ebenfalls ungespeichert. Anders als Tendenz/Wunsch geht die Diät im
+      Systemprompt als harte Vorgabe ein, nicht als „bevorzugt erfüllen" — sonst
+      schlüge das Modell im Zweifel doch Fleisch vor. Single-select, weil
+      „vegan" „vegetarisch" schon einschließt.
 - [ ] **Das Rezept überlebt keinen Seitenwechsel.** Es lebt im Ergebnis der
       Form-Action; wer während des Kochens auf „Bestand" tippt, verliert es.
       Bewusst so für die erste Fassung — eine Sammlung ist ausgeschlossen (§5).
