@@ -129,24 +129,24 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ## 2. Screens
 
-- [ ] **Bestand** (Start) — Standardsortierung nach Ablauf, nicht alphabetisch.
+- [x] **Bestand** (Start) — Standardsortierung nach Ablauf, nicht alphabetisch.
       Orte als segmentierte Tabs oben, nicht als Dropdown.
-- [ ] **Schnellaktionen in der Liste** — kein Detail-Screen für den Normalfall.
+- [x] **Schnellaktionen in der Liste** — kein Detail-Screen für den Normalfall.
       Große `−` / `+` direkt an der Zeile, Wischen nach rechts = aufgebraucht.
-- [ ] **Artikel-Detail** als Bottom-Sheet — Ort, MHD, Einheit, Füllstand.
+- [x] **Artikel-Detail** als Bottom-Sheet — Ort, MHD, Einheit, Füllstand.
       Füllstand als vier Knöpfe mit Balkenvorschau, nie als Regler.
-- [ ] **Schnell hinzufügen** — Chips der häufigsten Produkte zum Ein-Tap-Nachlegen,
+- [x] **Schnell hinzufügen** — Chips der häufigsten Produkte zum Ein-Tap-Nachlegen,
       darunter erst die Suche. Das Meiste ist Nachkauf von immer demselben.
 - [x] **Bon aufnehmen** — großer Knopf geht direkt in die Kamera
       (`capture="environment"`), darunter klein „aus der Galerie" ohne
       `capture`, was iOS die Auswahl zeigen lässt. Mehrere Aufnahmen pro Bon.
 - [x] **Bon prüfen** — Zeilen als Karten, Unsicheres hervorgehoben,
       „Alle übernehmen" als Primäraktion, Korrigieren als Ausnahme.
-- [ ] **Bald schlecht** — nach Dringlichkeit, mit „aufgebraucht"-Geste.
+- [x] **Bald schlecht** — nach Dringlichkeit, mit „aufgebraucht"-Geste.
 - [x] **Einkaufsliste** — manuell plus Vorschläge, abhaken mit großem Ziel.
-- [ ] **Was koche ich?** — ein Button, Vorschlag aus dem Bestand,
+- [x] **Was koche ich?** — ein Button, Vorschlag aus dem Bestand,
       Ablaufendes bevorzugt.
-- [ ] **Einstellungen** — Kategorien und ihre MHD-Defaults, direkt editierbar.
+- [x] **Einstellungen** — Kategorien und ihre MHD-Defaults, direkt editierbar.
       Der einzige Screen, auf dem eine Tastatur richtig ist: man sitzt dabei,
       macht es selten, und „14" tippen schlägt vierzehnmal Plus drücken.
 
@@ -514,8 +514,10 @@ Angenommene Defaults, bis widersprochen wird:
       verarbeitet Bilder nur bis 1568 px und ist für Bonschrift damit nicht
       billiger, sondern untauglich. Ein synthetischer Bon kostete im Test
       ~1,5 ct und brauchte 7 Sekunden.
-- [ ] **`tailscale serve`** — erst zu M10, dann verbindlich, weil iOS ohne
-      HTTPS keinen Service Worker registriert.
+- [x] **`tailscale serve`** — eingerichtet mit M10, siehe dort. Der
+      ursprüngliche Grund (Service Worker braucht HTTPS) ist inzwischen
+      hinfällig — der Service Worker selbst ist ja bewusst weggelassen —,
+      HTTPS läuft trotzdem, fürs saubere Homescreen-Icon.
 - [x] **Bon-Bilder** — 90 Tage aufbewahren, dann automatisch löschen. Liegen
       seit M5 unter `data/receipts/`, also im Bind-Mount neben der Datenbank;
       der Aufräumjob läuft jetzt über `hooks.server.ts`, siehe M9.
