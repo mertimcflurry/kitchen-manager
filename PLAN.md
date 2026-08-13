@@ -163,11 +163,10 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ## 3. Meilensteine
 
-**Stand 2026-08-13:** M0–M8 stehen im Code, `check`/`lint`/`test`/`build`
-laufen sauber (228 Tests). Offen ist überall nur noch das Gegenprüfen am
-Handy — die Punkte stehen bei den jeweiligen Meilensteinen. Als Nächstes
-**M9 (Betrieb im Container)**, mit dem Aufräumjob für Bon-Bilder als offener
-Zutat (§4).
+**Stand 2026-08-13:** M0–M9 stehen im Code, `check`/`lint`/`test`/`build`
+laufen sauber (232 Tests), der Container läuft probeweise auf dem Pi. Offen
+ist überall nur noch das Gegenprüfen am Handy — die Punkte stehen bei den
+jeweiligen Meilensteinen. Als Nächstes **M10 (PWA)**.
 
 ### M0 — Kontext und Repo ✅
 
@@ -432,11 +431,36 @@ die kennt die Seite ohne Modell.
   keine eigene Sammlung". Falls das später ernsthaft gewünscht wird, ändert
   sich zuerst `CLAUDE.md`, nicht heimlich der Code.
 
-### M9 — Betrieb
+### M9 — Betrieb ✅
 
-- [ ] Dockerfile für Node 22, Build auf aarch64
-- [ ] `compose.yml` auf Port 3001, `data/` als Bind-Mount, non-root
-- [ ] Autostart, Backup-Notiz in `~/docker/README.md`-Manier
+- [x] **Dockerfile für Node 22, Build auf aarch64.** Multi-Stage: Builder mit
+      `python3`/`make`/`g++` fürs native Nachkompilieren von `better-sqlite3`,
+      `npm prune --omit=dev` danach statt einem zweiten Install im
+      Laufzeit-Image. `DATABASE_URL` als harmloser Platzhalterwert nur für den
+      Build — SvelteKits Analyse-Schritt lädt `db/index.ts` einmal an, das
+      wirft sonst sofort (kein Geheimnis, echte Werte kommen erst zur Laufzeit
+      über `env_file`). Läuft als `node`, der uid/gid-1000-Nutzer aus dem
+      offiziellen Image, passend zum Bind-Mount, der dem Pi-Nutzer gehört.
+      Auf dem Pi selbst gebaut und probeweise laufen lassen — 406 MB, `/` und
+      `/kochen` antworten mit 200.
+- [x] **`compose.yml` auf Port 3001, `data/` als Bind-Mount, non-root.**
+      `restart: unless-stopped`, `env_file: .env` für den API-Key.
+- [x] **Autostart.** Kein eigener systemd-Dienst nötig: `docker` ist auf dem Pi
+      schon als Systemdienst aktiviert (`systemctl is-enabled docker` →
+      `enabled`), `restart: unless-stopped` im Compose-File erledigt den Rest.
+- [x] **Backup-Notiz** in `README.md` — Container kurz anhalten, `data/`
+      kopieren, wieder starten. Für einen Ein-Nutzer-Haushalt ist die Sekunde
+      Ausfall kein Problem, ein Online-Backup bei laufendem WAL-Modus also
+      nicht nötig.
+- [x] **Aufräumjob für Bon-Bilder (§4).** `cleanupOldReceiptImages`
+      (`$lib/server/receipt-cleanup.ts`) löscht Dateien über 90 Tage plus die
+      zugehörige `receipt_image`-Zeile — der Bon selbst (Posten, Rohantwort)
+      bleibt für Auswertung und Fehlersuche stehen, nur die Fotos sind der
+      teure Teil auf der SD-Karte. Kein externer Cronjob: `src/hooks.server.ts`
+      startet ihn einmal beim Hochfahren und danach alle 24 Stunden über ein
+      `.unref()`tes `setInterval` — der Container läuft ohnehin dauerhaft.
+      `building` aus `$app/environment` verhindert, dass der erste Lauf schon
+      während des Docker-Builds gegen die leere Platzhalter-DB feuert.
 
 ### M10 — PWA
 
@@ -457,9 +481,9 @@ Angenommene Defaults, bis widersprochen wird:
       ~1,5 ct und brauchte 7 Sekunden.
 - [ ] **`tailscale serve`** — erst zu M10, dann verbindlich, weil iOS ohne
       HTTPS keinen Service Worker registriert.
-- [ ] **Bon-Bilder** — 90 Tage aufbewahren, dann automatisch löschen. Liegen
+- [x] **Bon-Bilder** — 90 Tage aufbewahren, dann automatisch löschen. Liegen
       seit M5 unter `data/receipts/`, also im Bind-Mount neben der Datenbank;
-      der Aufräumjob fehlt noch und gehört zu M9.
+      der Aufräumjob läuft jetzt über `hooks.server.ts`, siehe M9.
 - [ ] **Orte** — feste Liste Kühlschrank/Gefrier/Vorrat, keine freien Orte.
 - [ ] **`~/projects/README.md`** — Vermerk nachtragen, dass dieses Projekt vom
       dokumentierten Python-Standard-Stack abweicht (noch nicht gemacht,

@@ -1,0 +1,12 @@
+services:
+  kitchen-manager:
+    build: .
+    container_name: kitchen-manager
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    env_file:
+      - .env
+    volumes:
+      # DB und Bon-Bilder (data/receipts/) in einem Bind-Mount, siehe CLAUDE.md.
+      - ./data:/app/data

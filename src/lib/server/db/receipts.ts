@@ -7,7 +7,7 @@
  * wie dort: keine SvelteKit-Importe, damit es ohne Kit testbar bleibt.
  */
 
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
 import type { ParsedReceipt } from '../ai/receipt-parse';
 import { normalizeRawText } from '../ai/receipt-parse';
 import type { Location, Unit } from '../../domain';
@@ -37,6 +37,25 @@ export function createPendingReceipt(db: Db): number {
 
 export function addReceiptImage(db: Db, receiptId: number, path: string, sortOrder: number): void {
 	db.insert(receiptImage).values({ receiptId, path, sortOrder }).run();
+}
+
+/**
+ * Bild-Metadaten, die älter als `before` sind — für den Aufräumjob (§4, M9).
+ * Nur die Bilder, nicht der Bon: Fotos sind der teure Teil auf der SD-Karte,
+ * Posten und Rohantwort bleiben für Auswertung und Fehlersuche stehen.
+ */
+export function oldReceiptImages(db: Db, before: Date): Array<{ id: number; path: string }> {
+	return db
+		.select({ id: receiptImage.id, path: receiptImage.path })
+		.from(receiptImage)
+		.where(lt(receiptImage.createdAt, before))
+		.all();
+}
+
+/** Löscht die Bild-Metadaten — die Datei selbst räumt der Aufrufer vorher weg. */
+export function deleteReceiptImages(db: Db, ids: number[]): void {
+	if (ids.length === 0) return;
+	db.delete(receiptImage).where(inArray(receiptImage.id, ids)).run();
 }
 
 export function discardReceipt(db: Db, receiptId: number, rawResponse?: string): void {
