@@ -244,6 +244,19 @@ stehen bei den jeweiligen Meilensteinen.
 - [x] Fehlerfälle: unlesbar, Zeitüberschreitung, kein Guthaben, kein Schlüssel —
       jeder mit eigenem Satz, weil jeder eine andere Reaktion verlangt.
       Fehlgeschlagene Bons bleiben samt Rohantwort als `discarded` liegen.
+- [x] **Kamera-Fotos scheiterten mit „Keine Verbindung zum Server" —
+      gefunden 2026-08-13 beim Gegenprüfen am Handy.** Kein Bug im Bon-Code:
+      `adapter-node` begrenzt Anfragen standardmäßig auf 512 K, mehrere
+      komprimierte Aufnahmen (bis 2576 px Kante) reißen das zusammen locker,
+      eine einzelne schon vorkomprimierte Datei aus einer Fremd-App (Lidl)
+      blieb meist knapp drunter — daher die Diskrepanz. Der Dev-Server kennt
+      dieses Limit nicht, nur `adapter-node`, deshalb fiel es erst nach M9
+      auf. Der Server bricht die Verbindung beim Überschreiten ab, was im
+      Browser wie ein Netzfehler aussieht statt wie ein sauberer Fehler —
+      `catch { error = 'Keine Verbindung zum Server.' }` in `+page.svelte`
+      trifft also zufällig den richtigen Text für den falschen Grund. Fix:
+      `BODY_SIZE_LIMIT=20M` in `compose.yml`, mit `curl` gegen 2–3 MB
+      gegengeprüft (volle HTTP-Antwort statt Verbindungsabbruch).
 - [ ] **Am Handy gegenprüfen**: echter Bon bei Küchenlicht, Kamera-Knopf auf
       iOS, Lesbarkeit der Karten, ob vier Aufnahmen für einen langen Bon reichen
 

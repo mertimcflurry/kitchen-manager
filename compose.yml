@@ -7,6 +7,13 @@ services:
       - '3001:3001'
     env_file:
       - .env
+    environment:
+      # adapter-node begrenzt Anfragen sonst auf 512K — ein einzelnes
+      # komprimiertes Bon-Foto (bis 2576px Kante) reißt das schon fast, vier
+      # Aufnahmen in einer Anfrage sicher. Der Server bricht die Verbindung
+      # dann ab, im Browser sieht das wie „keine Verbindung zum Server" aus,
+      # nicht wie ein sauberer Fehler.
+      - BODY_SIZE_LIMIT=20M
     volumes:
       # DB und Bon-Bilder (data/receipts/) in einem Bind-Mount, siehe CLAUDE.md.
       - ./data:/app/data
