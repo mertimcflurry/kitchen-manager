@@ -18,7 +18,7 @@ Tailwind. Weicht bewusst vom Python-Standard-Stack in `~/projects/README.md` ab.
 
 ## Stand
 
-M0–M9 stehen im Code. Details in [PLAN.md](PLAN.md).
+M0–M10 stehen im Code. Details in [PLAN.md](PLAN.md).
 
 ## Entwicklung
 
@@ -33,6 +33,11 @@ npm test         # Vitest
 Läuft als eigener Container auf Port 3001, `data/` als Bind-Mount daneben —
 anders als die Dienste unter `~/docker/`, bleibt dieses Repo unter
 `~/projects/kitchen-manager` (siehe `CLAUDE.md`).
+
+Erreichbar per HTTPS über `https://raspbert-1.tailfa6004.ts.net`
+(`tailscale serve`, tailnet-only, proxied auf `127.0.0.1:3001`) — „Zum
+Home-Bildschirm" läuft auch so schon über HTTP, HTTPS ist nur Vorbedingung
+für einen möglichen späteren Service Worker (siehe `PLAN.md`, M10).
 
 ```bash
 docker compose up -d --build   # bauen und starten
