@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -14,6 +15,41 @@
 
 	let { data }: { data: PageData } = $props();
 
+	/**
+	 * Ein gemerktes Rezept, kein Verlauf — die kleinste Reparatur für „wer
+	 * während des Kochens auf Bestand tippt, verliert den Vorschlag" (PLAN.md
+	 * §4b). `localStorage` statt einer Tabelle: es gibt nichts auszuwerten,
+	 * nur den letzten Stand zu überleben. Undo-Zustand und die Tendenz-Chips
+	 * bleiben bewusst außen vor — Undo ist ein kurzes Zeitfenster, keine
+	 * Dauereinrichtung, und „jeder Aufruf startet leer" gilt weiter für Chips
+	 * und Freitext.
+	 */
+	const RECIPE_STORAGE_KEY = 'kochen:recipe';
+	type StoredRecipe = { recipe: ParsedRecipe; cooked: boolean; nothingToBook: boolean };
+
+	function loadStoredRecipe(): StoredRecipe | null {
+		if (!browser) return null;
+		try {
+			const raw = localStorage.getItem(RECIPE_STORAGE_KEY);
+			return raw ? (JSON.parse(raw) as StoredRecipe) : null;
+		} catch {
+			return null;
+		}
+	}
+
+	function storeRecipe(next: StoredRecipe | null): void {
+		if (!browser) return;
+		try {
+			if (next) localStorage.setItem(RECIPE_STORAGE_KEY, JSON.stringify(next));
+			else localStorage.removeItem(RECIPE_STORAGE_KEY);
+		} catch {
+			// Privater Modus o. Ä. blockiert localStorage — dann bleibt es eben
+			// beim alten Verhalten, kein Grund, deswegen etwas zu melden.
+		}
+	}
+
+	const storedOnMount = loadStoredRecipe();
+
 	// Ziele als Literale, damit resolve() sie prüfen kann — wie bei den Ort-Tabs.
 	const portionTabs = [
 		{ value: 1, route: '/kochen?portionen=1' },
@@ -21,7 +57,7 @@
 		{ value: 4, route: '/kochen?portionen=4' }
 	] as const satisfies ReadonlyArray<{ value: number; route: string }>;
 
-	let recipe = $state<ParsedRecipe | null>(null);
+	let recipe = $state<ParsedRecipe | null>(storedOnMount?.recipe ?? null);
 	let busy = $state(false);
 	let error = $state('');
 
@@ -32,9 +68,11 @@
 	 * kocht — ein zweiter Tap darf den Bestand nicht ein zweites Mal senken.
 	 * Zurück kommt er über „Rückgängig".
 	 */
-	let cooked = $state(false);
+	let cooked = $state(storedOnMount?.cooked ?? false);
 	/** Gesetzt, wenn „Gekocht" nichts zum Abbuchen fand (nur Grundzutaten/Fehlt-noch). */
-	let nothingToBook = $state(false);
+	let nothingToBook = $state(storedOnMount?.nothingToBook ?? false);
+	// Undo lebt bewusst nicht in localStorage: ein kurzes Zeitfenster nach der
+	// Aktion, keine Dauereinrichtung, die einen Seitenwechsel überleben soll.
 	let undoSnapshots = $state<CookedSnapshot[] | null>(null);
 	let undoRound = $state(0);
 
@@ -118,6 +156,11 @@
 	 */
 	$effect(() => {
 		if (recipe && recipe.portions !== data.portions) recipe = scaleRecipe(recipe, data.portions);
+	});
+
+	/** Hält `localStorage` mit dem sichtbaren Zustand synchron, egal wodurch er sich ändert. */
+	$effect(() => {
+		storeRecipe(recipe ? { recipe, cooked, nothingToBook } : null);
 	});
 
 	const suggest: SubmitFunction = () => {

@@ -694,11 +694,18 @@ klar ist, ob es im Alltag stört.
       Systemprompt als harte Vorgabe ein, nicht als „bevorzugt erfüllen" — sonst
       schlüge das Modell im Zweifel doch Fleisch vor. Single-select, weil
       „vegan" „vegetarisch" schon einschließt.
-- [ ] **Das Rezept überlebt keinen Seitenwechsel.** Es lebt im Ergebnis der
-      Form-Action; wer während des Kochens auf „Bestand" tippt, verliert es.
-      Bewusst so für die erste Fassung — eine Sammlung ist ausgeschlossen (§5).
-      Falls es im Alltag stört, ist die kleinste Reparatur _ein_ gemerktes
-      Rezept als JSON, keine Tabelle mit Verlauf.
+- [x] **Das Rezept überlebt jetzt einen Seitenwechsel — 2026-08-13, genau die
+      damals skizzierte kleinste Reparatur.** Ein gemerktes Rezept in
+      `localStorage` (`kochen:recipe`), keine Tabelle, keine Sammlung (§5
+      bleibt unberührt — es ist Zwischenspeicher, kein Verlauf, wird bei
+      jedem neuen Vorschlag überschrieben). Mitgespeichert: `recipe`,
+      `cooked`, `nothingToBook` — genug, damit der „Gekocht"-Knopf nach der
+      Rückkehr nicht erneut abbucht. Bewusst **nicht** mitgespeichert: die
+      Undo-Snapshots (ein kurzes Zeitfenster nach der Aktion, keine
+      Dauereinrichtung) und Tendenz/Diät/Wunsch (die sollen laut Entscheidung
+      oben weiterhin bei jedem Aufruf leer starten). Ein einziger `$effect`
+      schreibt bei jeder Änderung von `recipe`/`cooked`/`nothingToBook`
+      zurück — kein Aufruf an mehreren Stellen, der auseinanderlaufen könnte.
 - [ ] **Marker für geschätzte MHDs entfernt.** Das `?` stand in fast jeder
       Zeile und sagte damit nichts. Ob geschätzt oder abgetippt, steht jetzt nur
       im Detail-Sheet. Offen, ob das in der Liste doch fehlt — dann aber als
