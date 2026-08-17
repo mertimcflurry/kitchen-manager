@@ -146,6 +146,14 @@ Ohne gültiges Cookie leitet `hooks.server.ts` auf `/nutzer` um (Auswahl oder
 Neuanlage), außer man ist schon dort. Kein Onboarding-Assistent, keine
 Pflichtfelder außer dem Namen.
 
+Das Nutzer-Cookie (`setUserCookie` in `user-cookie.ts`) setzt bewusst
+`secure: false`. SvelteKits Default ist `secure: true`, außer der Host ist
+exakt `localhost` über HTTP — der Tailscale-Hostname vom Handy aus (Dev, Port
+5173, kein TLS) trifft das nicht. Ohne das Override verwirft der Browser das
+Set-Cookie über die unverschlüsselte Verbindung still, und `/nutzer` landet
+in einer Wahl-Schleife, die sich nie löst. Tailscale ist hier ohnehin die
+einzige Grenze, nicht TLS.
+
 **Migrationen** immer über Drizzle generieren, nie das Schema von Hand am
 laufenden System ändern.
 
