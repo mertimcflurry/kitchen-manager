@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDb, type Db } from '$lib/server/db/client';
 import { findOrCreateProduct, addStock } from '$lib/server/db/queries';
 import { seedCategories } from '$lib/server/db/seed';
+import { user } from '$lib/server/db/schema';
 
 /**
  * Wie in `ablauf/page-server.spec.ts`: `+page.server.ts` importiert `db` aus
@@ -18,10 +19,15 @@ vi.mock('$lib/server/db', () => ({
 }));
 
 const { load: rawLoad, actions } = await import('./+page.server');
-const load = rawLoad as unknown as (event: { url: URL }) => { portions: number; urgent: unknown[] };
+const load = rawLoad as unknown as (event: { url: URL; locals: { userId: number } }) => {
+	portions: number;
+	urgent: unknown[];
+};
 
-function loadEvent(query = ''): { url: URL } {
-	return { url: new URL(`http://localhost/kochen${query}`) };
+let userId: number;
+
+function loadEvent(query = ''): { url: URL; locals: { userId: number } } {
+	return { url: new URL(`http://localhost/kochen${query}`), locals: { userId } };
 }
 
 function form(fields: Record<string, string>): Request {
@@ -31,15 +37,18 @@ function form(fields: Record<string, string>): Request {
 }
 
 function actionEvent(fields: Record<string, string>) {
-	return { request: form(fields), url: new URL('http://localhost/kochen') } as Parameters<
-		(typeof actions)['gekocht']
-	>[0];
+	return {
+		request: form(fields),
+		url: new URL('http://localhost/kochen'),
+		locals: { userId }
+	} as Parameters<(typeof actions)['gekocht']>[0];
 }
 
 beforeEach(() => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
 	seedCategories(db);
+	userId = db.insert(user).values({ name: 'Test' }).returning({ id: user.id }).get().id;
 });
 
 describe('load — Portionen aus der Query', () => {
@@ -79,7 +88,7 @@ describe('action gekocht', () => {
 
 	it('bucht bei gültiger Eingabe tatsächlich ab', async () => {
 		const productId = findOrCreateProduct(db, 'Testzutat');
-		const id = addStock(db, { productId, quantity: 500, unit: 'g', location: 'fridge' });
+		const id = addStock(db, userId, { productId, quantity: 500, unit: 'g', location: 'fridge' });
 
 		const result = (await actions.gekocht(
 			actionEvent({ ingredients: JSON.stringify([{ stockItemId: id, amountBase: 200 }]) })
@@ -108,7 +117,7 @@ describe('action undo', () => {
 
 	it('stellt bei gültiger Eingabe den Vorzustand wieder her', async () => {
 		const productId = findOrCreateProduct(db, 'Testzutat');
-		const id = addStock(db, { productId, quantity: 500, unit: 'g', location: 'fridge' });
+		const id = addStock(db, userId, { productId, quantity: 500, unit: 'g', location: 'fridge' });
 
 		await actions.gekocht(
 			actionEvent({ ingredients: JSON.stringify([{ stockItemId: id, amountBase: 500 }]) })

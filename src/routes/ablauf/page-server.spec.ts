@@ -4,7 +4,7 @@ import { EXPIRY_HORIZON_DAYS } from '$lib/date';
 import { createDb, type Db } from '$lib/server/db/client';
 import { findOrCreateProduct } from '$lib/server/db/queries';
 import { seedCategories } from '$lib/server/db/seed';
-import { stockItem } from '$lib/server/db/schema';
+import { stockItem, user } from '$lib/server/db/schema';
 
 /**
  * Wie in stock-actions.spec.ts: `+page.server.ts` importiert `db` aus
@@ -21,11 +21,17 @@ vi.mock('$lib/server/db', () => ({
 const { load: rawLoad } = await import('./+page.server');
 // `PageServerLoad` ist der generische Kit-Vertrag, nicht die konkrete
 // Rückgabe dieser Funktion — die verliert man sonst an `void | Record<...>`.
-const load = rawLoad as unknown as () => {
+const load = rawLoad as unknown as (event: { locals: { userId: number } }) => {
 	items: Array<{ name: string }>;
 	laterCount: number;
 	horizonDays: number;
 };
+
+let userId: number;
+
+function callLoad() {
+	return load({ locals: { userId } });
+}
 
 /** Legt einen Posten an, dessen MHD `daysFromNow` Kalendertage entfernt liegt. */
 function addItem(name: string, daysFromNow: number | null) {
@@ -36,13 +42,14 @@ function addItem(name: string, daysFromNow: number | null) {
 		bestBefore.setHours(0, 0, 0, 0);
 		bestBefore.setDate(bestBefore.getDate() + daysFromNow);
 	}
-	db.insert(stockItem).values({ productId: id, bestBefore }).run();
+	db.insert(stockItem).values({ userId, productId: id, bestBefore }).run();
 }
 
 beforeEach(() => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
 	seedCategories(db);
+	userId = db.insert(user).values({ name: 'Test' }).returning({ id: user.id }).get().id;
 });
 
 describe('load', () => {
@@ -52,7 +59,7 @@ describe('load', () => {
 		addItem('Genau am Horizont', EXPIRY_HORIZON_DAYS);
 		addItem('Einen Tag zu weit weg', EXPIRY_HORIZON_DAYS + 1);
 
-		const result = load();
+		const result = callLoad();
 
 		expect(new Set(result.items.map((i) => i.name))).toEqual(
 			new Set(['Abgelaufen', 'Heute fällig', 'Genau am Horizont'])
@@ -64,7 +71,7 @@ describe('load', () => {
 		addItem('Ohne Datum', null);
 		addItem('Bald fällig', 1);
 
-		const result = load();
+		const result = callLoad();
 
 		expect(result.items.map((i) => i.name)).toEqual(['Bald fällig']);
 		expect(result.laterCount).toBe(1);
@@ -74,14 +81,14 @@ describe('load', () => {
 		addItem('Weit weg', 60);
 		addItem('Auch weit weg', 90);
 
-		const result = load();
+		const result = callLoad();
 
 		expect(result.items).toHaveLength(0);
 		expect(result.laterCount).toBe(2);
 	});
 
 	it('gibt den Horizont mit, statt ihn im Template zu wiederholen', () => {
-		const result = load();
+		const result = callLoad();
 		expect(result.horizonDays).toBe(EXPIRY_HORIZON_DAYS);
 	});
 });

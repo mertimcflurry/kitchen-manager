@@ -21,6 +21,21 @@ import { LOCATIONS, UNITS } from '../../domain';
 export { FILL_LEVELS, LOCATIONS, UNITS } from '../../domain';
 export type { FillLevel, Location, Unit } from '../../domain';
 
+/**
+ * Ein Gerät kennt genau einen Nutzer über ein langlebiges Cookie — kein
+ * Login, keine Rollen. Die Tabelle trennt nur Bestände, nicht Rechte: siehe
+ * „Kein Auth, trotzdem mehrere Nutzer" in CLAUDE.md.
+ */
+export const user = sqliteTable('user', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	/** Frei gewählt beim Anlegen, keine Eindeutigkeitspflicht. */
+	name: text('name').notNull(),
+	/** Auch die Sortierung in der Auswahl auf /nutzer. */
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
 /** Kategorie liefert die MHD-Schätzung, wenn das Produkt keine eigene hat. */
 export const category = sqliteTable('category', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -72,6 +87,14 @@ export const stockItem = sqliteTable(
 	'stock_item',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
+		/**
+		 * Wessen Bestand — seit M11. `restrict` statt `cascade`: es gibt ohnehin
+		 * keine Löschfunktion für Nutzer, aber die Fremdschlüssel-Regel soll das
+		 * nicht stillschweigend erlauben und dabei ganze Bestände mitreißen.
+		 */
+		userId: integer('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'restrict' }),
 		productId: integer('product_id')
 			.notNull()
 			.references(() => product.id, { onDelete: 'cascade' }),
@@ -120,7 +143,8 @@ export const stockItem = sqliteTable(
 		// Die Hauptabfrage: offener Bestand, nach Ablauf sortiert.
 		index('stock_open_by_expiry_idx').on(t.consumedAt, t.bestBefore),
 		index('stock_product_idx').on(t.productId),
-		index('stock_location_idx').on(t.location)
+		index('stock_location_idx').on(t.location),
+		index('stock_user_idx').on(t.userId)
 	]
 );
 
@@ -129,6 +153,10 @@ export const receipt = sqliteTable(
 	'receipt',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
+		/** Wer den Bon eingescannt hat — seit M11. */
+		userId: integer('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'restrict' }),
 		store: text('store'),
 		purchasedAt: integer('purchased_at', { mode: 'timestamp' }),
 		totalCents: integer('total_cents'),
@@ -141,7 +169,7 @@ export const receipt = sqliteTable(
 			.notNull()
 			.$defaultFn(() => new Date())
 	},
-	(t) => [index('receipt_status_idx').on(t.status)]
+	(t) => [index('receipt_status_idx').on(t.status), index('receipt_user_idx').on(t.userId)]
 );
 
 /**
@@ -236,6 +264,10 @@ export const shoppingListItem = sqliteTable(
 	'shopping_list_item',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
+		/** Wessen Einkaufsliste — seit M11. */
+		userId: integer('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'restrict' }),
 		/** Entweder ein bekanntes Produkt oder freier Text — eins von beiden. */
 		productId: integer('product_id').references(() => product.id, { onDelete: 'cascade' }),
 		freeText: text('free_text'),
@@ -249,10 +281,16 @@ export const shoppingListItem = sqliteTable(
 			.notNull()
 			.$defaultFn(() => new Date())
 	},
-	(t) => [index('shopping_open_idx').on(t.isDone)]
+	(t) => [index('shopping_open_idx').on(t.isDone), index('shopping_user_idx').on(t.userId)]
 );
 
 /* ---------- Beziehungen für die Drizzle-Query-API ---------- */
+
+export const userRelations = relations(user, ({ many }) => ({
+	stockItems: many(stockItem),
+	receipts: many(receipt),
+	shoppingListItems: many(shoppingListItem)
+}));
 
 export const categoryRelations = relations(category, ({ many }) => ({
 	products: many(product)
@@ -265,11 +303,13 @@ export const productRelations = relations(product, ({ one, many }) => ({
 }));
 
 export const stockItemRelations = relations(stockItem, ({ one }) => ({
+	user: one(user, { fields: [stockItem.userId], references: [user.id] }),
 	product: one(product, { fields: [stockItem.productId], references: [product.id] }),
 	receipt: one(receipt, { fields: [stockItem.receiptId], references: [receipt.id] })
 }));
 
-export const receiptRelations = relations(receipt, ({ many }) => ({
+export const receiptRelations = relations(receipt, ({ one, many }) => ({
+	user: one(user, { fields: [receipt.userId], references: [user.id] }),
 	lines: many(receiptLine),
 	images: many(receiptImage)
 }));
@@ -288,11 +328,14 @@ export const productAliasRelations = relations(productAlias, ({ one }) => ({
 }));
 
 export const shoppingListItemRelations = relations(shoppingListItem, ({ one }) => ({
+	user: one(user, { fields: [shoppingListItem.userId], references: [user.id] }),
 	product: one(product, { fields: [shoppingListItem.productId], references: [product.id] })
 }));
 
 /* ---------- Abgeleitete Typen ---------- */
 
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;
 export type Category = typeof category.$inferSelect;
 export type NewCategory = typeof category.$inferInsert;
 export type Product = typeof product.$inferSelect;

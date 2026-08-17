@@ -3,14 +3,14 @@ import { countByLocation, listCategories, listStock } from '$lib/server/db/queri
 import { parseLocation, stockActions } from '$lib/server/stock-actions';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ url }) => {
+export const load: PageServerLoad = ({ url, locals }) => {
 	// Der Ort steht in der URL, nicht in einem Store: dann bleibt die Auswahl
 	// beim Zurück-Wischen erhalten und ein Reload landet nicht wieder auf „Alle".
 	const location = parseLocation(url.searchParams.get('ort'));
 	return {
 		location: location ?? null,
-		items: listStock(db, location),
-		counts: countByLocation(db),
+		items: listStock(db, locals.userId, location),
+		counts: countByLocation(db, locals.userId),
 		// Fürs Kategorie-Feld im Artikel-Detail-Sheet.
 		categories: listCategories(db)
 	};

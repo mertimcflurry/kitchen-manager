@@ -57,6 +57,27 @@
       "when": 1786492828777,
       "tag": "0007_backfill_initial_quantity",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786952014224,
+      "tag": "0008_graceful_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786952100000,
+      "tag": "0009_backfill_default_user",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786952064126,
+      "tag": "0010_colossal_hercules",
+      "breakpoints": true
     }
   ]
 }

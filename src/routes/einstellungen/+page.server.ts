@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { listCategories, updateCategory } from '$lib/server/db/queries';
+import { getUser } from '$lib/server/db/users';
 import type { Actions, PageServerLoad } from './$types';
 
 function parseId(data: FormData): number | null {
@@ -8,9 +9,10 @@ function parseId(data: FormData): number | null {
 	return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
 	return {
-		categories: listCategories(db)
+		categories: listCategories(db),
+		currentUser: getUser(db, locals.userId)
 	};
 };
 

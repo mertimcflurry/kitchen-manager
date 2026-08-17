@@ -1,14 +1,26 @@
-import { count, sql } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { estimateBestBefore } from '../../date';
 import type { Db } from './client';
 import {
 	category,
 	product,
 	stockItem,
+	user,
 	type FillLevel,
 	type Location,
 	type NewCategory
 } from './schema';
+
+/** Name des Nutzers, dem der Entwicklungs-Seed seinen Bestand zuordnet. */
+const DEV_USER_NAME = 'Testnutzer';
+
+/** Legt den Test-Nutzer an, falls er noch nicht existiert — idempotent wie der Rest des Seeds. */
+function ensureDevUser(db: Db): number {
+	const existing = db.select({ id: user.id }).from(user).where(eq(user.name, DEV_USER_NAME)).get();
+	if (existing) return existing.id;
+
+	return db.insert(user).values({ name: DEV_USER_NAME }).returning({ id: user.id }).get().id;
+}
 
 /*
  * Zählen hier bewusst über select(count()).get() und nicht über db.$count():
@@ -160,9 +172,16 @@ const DEV_STOCK: Array<{
 	{ product: 'Erbsen TK', quantity: 750, location: 'freezer', boughtDaysAgo: 20 }
 ];
 
-/** Nur für die Entwicklung. Läuft nicht, wenn schon Bestand existiert. */
-export function seedDevData(db: Db): { products: number; stock: number } {
-	if (countStockItems(db) > 0) return { products: 0, stock: 0 };
+/**
+ * Nur für die Entwicklung. Legt Testprodukte und -bestand an, zugeordnet
+ * einem eigenen Testnutzer — seit M11 ist auch der Bestand nutzerscoped, ein
+ * Posten ohne Eigentümer ließe sich gar nicht anlegen. Läuft nicht noch
+ * einmal, wenn schon Bestand existiert, gibt dann aber trotzdem die Test-
+ * Nutzer-ID zurück, damit Aufrufer (z. B. Tests) sie immer bekommen.
+ */
+export function seedDevData(db: Db): { products: number; stock: number; userId: number } {
+	const devUserId = ensureDevUser(db);
+	if (countStockItems(db) > 0) return { products: 0, stock: 0, userId: devUserId };
 
 	const categoriesByName = new Map(
 		db
@@ -210,6 +229,7 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 
 		db.insert(stockItem)
 			.values({
+				userId: devUserId,
 				productId: prod.id,
 				quantity: s.quantity,
 				initialQuantity: s.initial ?? s.quantity,
@@ -223,7 +243,7 @@ export function seedDevData(db: Db): { products: number; stock: number } {
 			.run();
 	}
 
-	return { products: DEV_PRODUCTS.length, stock: DEV_STOCK.length };
+	return { products: DEV_PRODUCTS.length, stock: DEV_STOCK.length, userId: devUserId };
 }
 
 /** Leert alle Nutzdaten, behält aber die Kategorien. Nur für die Entwicklung. */

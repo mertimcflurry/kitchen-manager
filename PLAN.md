@@ -12,6 +12,18 @@ Getrennt in **Produkt** (Stammdaten, für Statistik und Einkaufsliste) und
 vom selben Produkt haben so eigene MHDs, und „was kaufe ich häufig" bleibt
 trotzdem sauber auswertbar.
 
+Seit M11 zusätzlich nach **Nutzer** getrennt, ohne Login — siehe dort.
+`stock_item`, `shopping_list_item` und `receipt` tragen ein `user_id`;
+`category`, `product` und `product_alias` bleiben geteiltes Referenzwissen.
+
+### `user`
+
+| Feld         | Typ    | Zweck                                                  |
+| ------------ | ------ | ------------------------------------------------------ |
+| `id`         | int PK |                                                        |
+| `name`       | text   | frei gewählt beim Anlegen, keine Eindeutigkeitspflicht |
+| `created_at` | int    | auch die Sortierung in der Auswahl                     |
+
 ### `category`
 
 | Feld                      | Typ    | Zweck                                         |
@@ -38,6 +50,7 @@ trotzdem sauber auswertbar.
 | Feld                       | Typ     | Zweck                                            |
 | -------------------------- | ------- | ------------------------------------------------ |
 | `id`                       | int PK  |                                                  |
+| `user_id`                  | int FK  | wessen Bestand — seit M11                        |
 | `product_id`               | int FK  |                                                  |
 | `quantity`                 | real    | Zahl, geändert über +/- — nie Tastatur           |
 | `initial_quantity`         | real?   | Startmenge — Bezugsgröße für den Balken          |
@@ -82,6 +95,7 @@ für die Einkaufsliste; das ist der eigentliche Zweck, nicht die Anzeige.
 | `receipt`      |        |                                                      |
 | -------------- | ------ | ---------------------------------------------------- |
 | `id`           | int PK |                                                      |
+| `user_id`      | int FK | wer den Bon eingescannt hat — seit M11               |
 | `store`        | text?  | vom Modell erkannt                                   |
 | `purchased_at` | int?   |                                                      |
 | `status`       | text   | `pending` \| `confirmed` \| `discarded`              |
@@ -122,8 +136,8 @@ nur noch der unbekannte Rest an die API — spart Tokens und Prüfaufwand.
 
 ### `shopping_list_item`
 
-`id` · `product_id?` · `free_text` · `quantity` · `unit` · `is_done` ·
-`source` (`manual` \| `suggested`) · `created_at`
+`id` · `user_id` (seit M11) · `product_id?` · `free_text` · `quantity` ·
+`unit` · `is_done` · `source` (`manual` \| `suggested`) · `created_at`
 
 ---
 
@@ -503,6 +517,37 @@ die kennt die Seite ohne Modell.
       Wieder aufmachen, falls sich zeigt, dass ein Tailscale-Aussetzer im
       Alltag wirklich stört.
 
+### M11 — Mehrere Nutzer
+
+Entschieden 2026-08-17, siehe die Begründung unter „Kein Auth, trotzdem
+mehrere Nutzer" in `CLAUDE.md`. Kein Login: ein Cookie pro Gerät merkt sich
+die Wahl, jeder mit Zugriff auf die Seite darf sich als jeder Nutzer ausgeben
+oder einen neuen anlegen.
+
+- [x] `user`-Tabelle (`id`, `name`, `created_at`), Migration erzeugen —
+      `0008_graceful_leader.sql` (Tabelle + nullbare Spalten),
+      `0009_backfill_default_user.sql` (Default-Nutzer „Ich", Backfill,
+      Muster wie `0004`/`0007`), `0010_colossal_hercules.sql` (NOT NULL).
+      Gegen die echte Dev-DB migriert, 94 Bestandsposten/9 Bons erhalten.
+- [x] `user_id` auf `stock_item`, `shopping_list_item`, `receipt` —
+      `category`, `product`, `product_alias` bleiben geteilt.
+- [x] `hooks.server.ts`: Cookie lesen, `locals.userId` setzen; ohne gültiges
+      Cookie Redirect auf `/nutzer` (außer man ist schon dort), Zielpfad als
+      `next`-Parameter mit
+- [x] Alle Queries und Form Actions zu Bestand, Einkaufsliste und Bon auf
+      `locals.userId` gescoped — inklusive `frequentProducts`/`lastPurchase`,
+      die bewusst pro Nutzer laufen, nicht nur global geteilte Daten.
+- [x] **Screen `/nutzer`**: große Kacheln im Daumenbereich, Bottom-Nav dort
+      ausgeblendet (`+layout.svelte`), „Neuer Nutzer" klappt ein Textfeld mit
+      Autofokus statt eines Formulars unter der letzten Kachel.
+- [x] Wechseln jederzeit möglich — Zeile „Angemeldet als …" oben in
+      „Einstellungen", verlinkt auf `/nutzer?next=/einstellungen`.
+- [x] Rezeptvorschlag (M8) — `recipeStock(db, locals.userId)` in
+      `src/routes/kochen/+page.server.ts` bestätigt nutzerscoped.
+- [ ] **Am Handy gegenprüfen**: Auswahl-Screen bei erstem Aufruf ohne Cookie,
+      Wechseln zwischen zwei angelegten Nutzern, dass keine Bestände sich
+      vermischen
+
 ---
 
 ## 4. Offene Entscheidungen
@@ -760,6 +805,9 @@ keine Lücke:
 - **Nährwerte und Kalorien** — braucht eine gepflegte Produktdatenbank.
 - **Eigene Rezeptsammlung** — Rezepte kommen vom Modell, nicht aus einer
   Verwaltung, die selbst wieder gepflegt werden will.
-- **Mehrere Nutzer, Teilen, Haushalte** — ein Nutzer, keine Auth.
+- **Rollen, Admin-Rechte, Zugriffskontrolle zwischen Nutzern** — mehrere
+  Nutzer gibt es seit M11, aber ohne Login und ohne Hierarchie unter ihnen.
+- **Teilen zwischen Haushalten**, Mandantenfähigkeit über das eigene Tailnet
+  hinaus.
 - **Automatische Nachbestellung** bei Händlern.
 - **Native App** — PWA reicht.

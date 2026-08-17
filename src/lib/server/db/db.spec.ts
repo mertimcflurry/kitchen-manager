@@ -10,7 +10,8 @@ import {
 	productAlias,
 	receipt,
 	receiptImage,
-	stockItem
+	stockItem,
+	user
 } from './schema';
 
 /** Frische Datenbank im Speicher — die Tests fassen data/kitchen.db nie an. */
@@ -63,7 +64,8 @@ describe('Fremdschlüssel', () => {
 			.values({ name: 'Testware', categoryId: cat.id })
 			.returning()
 			.get();
-		db.insert(stockItem).values({ productId: prod.id }).run();
+		const testUserId = db.insert(user).values({ name: 'Test' }).returning({ id: user.id }).get().id;
+		db.insert(stockItem).values({ userId: testUserId, productId: prod.id }).run();
 		expect(db.select().from(stockItem).all()).toHaveLength(1);
 
 		db.delete(product).where(eq(product.id, prod.id)).run();
@@ -102,7 +104,7 @@ describe('Bestandsabfrage', () => {
 	it('legt Testdaten nicht doppelt an', () => {
 		const before = db.select().from(stockItem).all().length;
 		const result = seedDevData(db);
-		expect(result).toEqual({ products: 0, stock: 0 });
+		expect(result).toMatchObject({ products: 0, stock: 0 });
 		expect(db.select().from(stockItem).all()).toHaveLength(before);
 	});
 
@@ -157,7 +159,8 @@ describe('Bestandsabfrage', () => {
 
 describe('receipt_image', () => {
 	function makeReceipt(): number {
-		return db.insert(receipt).values({}).returning().get().id;
+		const testUserId = db.insert(user).values({ name: 'Test' }).returning({ id: user.id }).get().id;
+		return db.insert(receipt).values({ userId: testUserId }).returning().get().id;
 	}
 
 	it('hält mehrere Fotos zu einem Bon in Reihenfolge', () => {

@@ -21,43 +21,44 @@ import {
 	updateStockItem
 } from './queries';
 import { seedCategories, seedDevData } from './seed';
-import { category, product, stockItem } from './schema';
+import { category, product, stockItem, user } from './schema';
 
 let db: Db;
+let userId: number;
 beforeEach(() => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
 	seedCategories(db);
-	seedDevData(db);
+	({ userId } = seedDevData(db));
 });
 
 describe('listStock', () => {
 	it('sortiert nach Ablauf, Dringendes zuerst', () => {
-		const rows = listStock(db);
+		const rows = listStock(db, userId);
 		const dates = rows.filter((r) => r.bestBefore).map((r) => r.bestBefore!.getTime());
 		expect(dates).toEqual([...dates].sort((a, b) => a - b));
 	});
 
 	it('stellt Posten ohne MHD hinten an, nicht vorn', () => {
 		const id = findOrCreateProduct(db, 'Ohne Datum');
-		db.insert(stockItem).values({ productId: id, bestBefore: null }).run();
+		db.insert(stockItem).values({ userId, productId: id, bestBefore: null }).run();
 
-		const rows = listStock(db);
+		const rows = listStock(db, userId);
 		// SQLite sortiert NULL sonst zuerst — dann führte Undatiertes die
 		// Dringlichkeitsliste an, ohne dringend zu sein.
 		expect(rows.at(-1)?.name).toBe('Ohne Datum');
 	});
 
 	it('filtert nach Ort', () => {
-		const pantry = listStock(db, 'pantry');
+		const pantry = listStock(db, userId, 'pantry');
 		expect(pantry.length).toBeGreaterThan(0);
 		expect(pantry.every((r) => r.location === 'pantry')).toBe(true);
 	});
 
 	it('zählt je Ort passend zur gefilterten Liste', () => {
-		const counts = countByLocation(db);
+		const counts = countByLocation(db, userId);
 		for (const loc of ['fridge', 'freezer', 'pantry'] as const) {
-			expect(counts[loc]).toBe(listStock(db, loc).length);
+			expect(counts[loc]).toBe(listStock(db, userId, loc).length);
 		}
 	});
 });
@@ -65,62 +66,62 @@ describe('listStock', () => {
 describe('countUrgent', () => {
 	it('zählt nur Abgelaufenes und das, was heute oder morgen fällig wird', () => {
 		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
-		const before = countUrgent(db);
+		const before = countUrgent(db, userId);
 
 		const tomorrow = new Date();
 		tomorrow.setDate(tomorrow.getDate() + 1);
-		const id = addStock(db, { productId: cheese.id, quantity: 1, location: 'fridge' });
+		const id = addStock(db, userId, { productId: cheese.id, quantity: 1, location: 'fridge' });
 		db.update(stockItem).set({ bestBefore: tomorrow }).where(eq(stockItem.id, id)).run();
 
-		expect(countUrgent(db)).toBe(before + 1);
+		expect(countUrgent(db, userId)).toBe(before + 1);
 	});
 
 	it('zählt Aufgebrauchtes und weit Entferntes nicht mit', () => {
 		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
-		const before = countUrgent(db);
+		const before = countUrgent(db, userId);
 
 		const farOut = new Date();
 		farOut.setDate(farOut.getDate() + 30);
-		const id = addStock(db, { productId: cheese.id, quantity: 1, location: 'fridge' });
+		const id = addStock(db, userId, { productId: cheese.id, quantity: 1, location: 'fridge' });
 		db.update(stockItem).set({ bestBefore: farOut }).where(eq(stockItem.id, id)).run();
-		expect(countUrgent(db)).toBe(before);
+		expect(countUrgent(db, userId)).toBe(before);
 
-		consume(db, id);
-		expect(countUrgent(db)).toBe(before);
+		consume(db, userId, id);
+		expect(countUrgent(db, userId)).toBe(before);
 	});
 });
 
 describe('adjustQuantity', () => {
 	it('zählt herunter, ohne aufzubrauchen', () => {
-		const before = listStock(db).find((r) => r.quantity > 1)!;
-		adjustQuantity(db, before.id, -1);
+		const before = listStock(db, userId).find((r) => r.quantity > 1)!;
+		adjustQuantity(db, userId, before.id, -1);
 
-		const after = listStock(db).find((r) => r.id === before.id);
+		const after = listStock(db, userId).find((r) => r.id === before.id);
 		expect(after?.quantity).toBe(before.quantity - 1);
 	});
 
 	it('gilt bei null als aufgebraucht — das Minus ist die letzte Entnahme', () => {
-		const item = listStock(db).find((r) => r.quantity === 1)!;
-		adjustQuantity(db, item.id, -1);
+		const item = listStock(db, userId).find((r) => r.quantity === 1)!;
+		adjustQuantity(db, userId, item.id, -1);
 
-		expect(listStock(db).find((r) => r.id === item.id)).toBeUndefined();
+		expect(listStock(db, userId).find((r) => r.id === item.id)).toBeUndefined();
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.consumedAt).not.toBeNull();
 	});
 
 	it('läuft nicht ins Negative', () => {
-		const item = listStock(db)[0];
-		adjustQuantity(db, item.id, -999);
+		const item = listStock(db, userId)[0];
+		adjustQuantity(db, userId, item.id, -999);
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.quantity).toBe(0);
 	});
 
 	it('lässt die Startmenge stehen, wenn entnommen wird', () => {
-		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
+		const eggs = listStock(db, userId).find((r) => r.name === 'Eier')!;
 		expect(eggs.initialQuantity).toBe(10);
 
-		adjustQuantity(db, eggs.id, -1);
-		const after = listStock(db).find((r) => r.id === eggs.id)!;
+		adjustQuantity(db, userId, eggs.id, -1);
+		const after = listStock(db, userId).find((r) => r.id === eggs.id)!;
 		expect(after.quantity).toBe(eggs.quantity - 1);
 		// Der Balken misst gegen die Startmenge — sie darf beim Entnehmen nicht
 		// mitwandern, sonst stünde die Zeile immer auf „voll".
@@ -128,10 +129,10 @@ describe('adjustQuantity', () => {
 	});
 
 	it('hebt die Startmenge an, wenn über sie hinaus nachgelegt wird', () => {
-		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
-		adjustQuantity(db, eggs.id, +10);
+		const eggs = listStock(db, userId).find((r) => r.name === 'Eier')!;
+		adjustQuantity(db, userId, eggs.id, +10);
 
-		const after = listStock(db).find((r) => r.id === eggs.id)!;
+		const after = listStock(db, userId).find((r) => r.id === eggs.id)!;
 		expect(after.quantity).toBe(16);
 		// Sonst zeigte der Balken 160 Prozent.
 		expect(after.initialQuantity).toBe(16);
@@ -140,33 +141,33 @@ describe('adjustQuantity', () => {
 
 describe('consume und undo', () => {
 	it('gibt den vorherigen Zustand zurück und stellt ihn wieder her', () => {
-		const item = listStock(db).find((r) => r.fillLevel !== null)!;
-		const snapshot = consume(db, item.id);
+		const item = listStock(db, userId).find((r) => r.fillLevel !== null)!;
+		const snapshot = consume(db, userId, item.id);
 
 		expect(snapshot).toEqual({
 			id: item.id,
 			quantity: item.quantity,
 			fillLevel: item.fillLevel
 		});
-		expect(listStock(db).find((r) => r.id === item.id)).toBeUndefined();
+		expect(listStock(db, userId).find((r) => r.id === item.id)).toBeUndefined();
 
-		undoConsume(db, snapshot!);
-		const restored = listStock(db).find((r) => r.id === item.id);
+		undoConsume(db, userId, snapshot!);
+		const restored = listStock(db, userId).find((r) => r.id === item.id);
 		expect(restored?.quantity).toBe(item.quantity);
 		expect(restored?.fillLevel).toBe(item.fillLevel);
 	});
 
 	it('brauchtes Aufgebrauchtes nicht zweimal auf', () => {
-		const item = listStock(db)[0];
-		expect(consume(db, item.id)).not.toBeNull();
-		expect(consume(db, item.id)).toBeNull();
+		const item = listStock(db, userId)[0];
+		expect(consume(db, userId, item.id)).not.toBeNull();
+		expect(consume(db, userId, item.id)).toBeNull();
 	});
 });
 
 describe('addStock', () => {
 	it('schätzt das MHD aus der Haltbarkeit des Produkts', () => {
 		const tofu = db.select().from(product).where(eq(product.name, 'Tofu natur')).get()!;
-		const id = addStock(db, { productId: tofu.id, quantity: 1, location: 'fridge' });
+		const id = addStock(db, userId, { productId: tofu.id, quantity: 1, location: 'fridge' });
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 		expect(row.bestBeforeIsEstimated).toBe(true);
@@ -176,7 +177,7 @@ describe('addStock', () => {
 	it('fällt auf die Haltbarkeit der Kategorie zurück', () => {
 		// Neue Produkte landen in „Sonstiges" (30 Tage) und haben keine eigene.
 		const id = findOrCreateProduct(db, 'Etwas Neues');
-		const stockId = addStock(db, { productId: id, quantity: 1, location: 'pantry' });
+		const stockId = addStock(db, userId, { productId: id, quantity: 1, location: 'pantry' });
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, stockId)).get()!;
 		expect(daysUntil(row.bestBefore!)).toBe(30);
@@ -192,7 +193,7 @@ describe('findOrCreateProduct', () => {
 
 	it('rät ohne categoryName die Kategorie aus dem Namen', () => {
 		const id = findOrCreateProduct(db, 'Pfirsich');
-		const row = listStock(db).find((r) => r.productId === id);
+		const row = listStock(db, userId).find((r) => r.productId === id);
 		// Neu angelegt, noch nicht eingelagert — über die Kategorien-Tabelle nachschauen.
 		const p = db.select().from(product).where(eq(product.id, id)).get()!;
 		const cat = db.select().from(category).where(eq(category.id, p.categoryId)).get()!;
@@ -229,12 +230,12 @@ describe('updateProductCategory', () => {
 	it('wirkt sich auf alle Posten des Produkts aus, nicht nur einen', () => {
 		const tofu = db.select().from(product).where(eq(product.name, 'Tofu natur')).get()!;
 		const konserven = db.select().from(category).where(eq(category.name, 'Konserven')).get()!;
-		addStock(db, { productId: tofu.id, quantity: 1, location: 'fridge' });
-		addStock(db, { productId: tofu.id, quantity: 1, location: 'pantry' });
+		addStock(db, userId, { productId: tofu.id, quantity: 1, location: 'fridge' });
+		addStock(db, userId, { productId: tofu.id, quantity: 1, location: 'pantry' });
 
 		updateProductCategory(db, tofu.id, konserven.id);
 
-		const rows = listStock(db).filter((r) => r.productId === tofu.id);
+		const rows = listStock(db, userId).filter((r) => r.productId === tofu.id);
 		expect(rows.length).toBeGreaterThan(0);
 		expect(rows.every((r) => r.categoryName === 'Konserven')).toBe(true);
 	});
@@ -244,10 +245,10 @@ describe('frequentProducts', () => {
 	it('stellt häufig Gekauftes nach vorn', () => {
 		const tofu = db.select().from(product).where(eq(product.name, 'Tofu natur')).get()!;
 		for (let i = 0; i < 5; i++) {
-			addStock(db, { productId: tofu.id, quantity: 1, location: 'fridge' });
+			addStock(db, userId, { productId: tofu.id, quantity: 1, location: 'fridge' });
 		}
 
-		expect(frequentProducts(db, 3)[0].name).toBe('Tofu natur');
+		expect(frequentProducts(db, userId, 3)[0].name).toBe('Tofu natur');
 	});
 });
 
@@ -255,15 +256,15 @@ describe('openOne', () => {
 	/** Vier Kartons Hafermilch, einer wird angebrochen. */
 	function fourPacks() {
 		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
-		const id = addStock(db, { productId: milk.id, quantity: 4, location: 'pantry' });
+		const id = addStock(db, userId, { productId: milk.id, quantity: 4, location: 'pantry' });
 		return { milk, id };
 	}
 
 	it('teilt eine Einheit ab, statt die ganze Zeile zu markieren', () => {
 		const { milk, id } = fourPacks();
-		const openedId = openOne(db, id);
+		const openedId = openOne(db, userId, id);
 
-		const rows = listStock(db).filter((r) => r.productId === milk.id && r.id !== 0);
+		const rows = listStock(db, userId).filter((r) => r.productId === milk.id && r.id !== 0);
 		const sealed = rows.find((r) => r.id === id);
 		const opened = rows.find((r) => r.id === openedId);
 
@@ -280,7 +281,7 @@ describe('openOne', () => {
 
 	it('gibt dem Geöffneten die kürzere Haltbarkeit', () => {
 		const { id } = fourPacks();
-		const openedId = openOne(db, id)!;
+		const openedId = openOne(db, userId, id)!;
 
 		const opened = db.select().from(stockItem).where(eq(stockItem.id, openedId)).get()!;
 		const sealed = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
@@ -292,31 +293,31 @@ describe('openOne', () => {
 
 	it('verlängert nie — was morgen abläuft, hält durch Öffnen nicht länger', () => {
 		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
-		const id = addStock(db, { productId: milk.id, quantity: 1, location: 'fridge' });
+		const id = addStock(db, userId, { productId: milk.id, quantity: 1, location: 'fridge' });
 		const tomorrow = new Date();
 		tomorrow.setDate(tomorrow.getDate() + 1);
 		db.update(stockItem).set({ bestBefore: tomorrow }).where(eq(stockItem.id, id)).run();
 
-		openOne(db, id);
+		openOne(db, userId, id);
 		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 		expect(daysUntil(row.bestBefore!)).toBe(1);
 	});
 
 	it('öffnet Einzelstücke an Ort und Stelle, ohne Leerposten', () => {
 		const milk = db.select().from(product).where(eq(product.name, 'Haferdrink')).get()!;
-		const id = addStock(db, { productId: milk.id, quantity: 1, location: 'fridge' });
+		const id = addStock(db, userId, { productId: milk.id, quantity: 1, location: 'fridge' });
 
-		expect(openOne(db, id)).toBe(id);
-		expect(listStock(db).filter((r) => r.productId === milk.id && r.quantity === 0)).toHaveLength(
-			0
-		);
+		expect(openOne(db, userId, id)).toBe(id);
+		expect(
+			listStock(db, userId).filter((r) => r.productId === milk.id && r.quantity === 0)
+		).toHaveLength(0);
 	});
 
 	it('öffnet lose Ware an Ort und Stelle, statt ein Gramm abzuteilen', () => {
 		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
-		const id = addStock(db, { productId: cheese.id, quantity: 200, location: 'fridge' });
+		const id = addStock(db, userId, { productId: cheese.id, quantity: 200, location: 'fridge' });
 
-		expect(openOne(db, id)).toBe(id);
+		expect(openOne(db, userId, id)).toBe(id);
 		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 		expect(row.quantity).toBe(200);
 		expect(row.fillLevel).toBe(100);
@@ -324,18 +325,18 @@ describe('openOne', () => {
 
 	it('lässt bereits Geöffnetes in Ruhe', () => {
 		const { id } = fourPacks();
-		const openedId = openOne(db, id)!;
-		expect(openOne(db, openedId)).toBeNull();
+		const openedId = openOne(db, userId, id)!;
+		expect(openOne(db, userId, openedId)).toBeNull();
 	});
 
 	it('lässt das Datum unberührt, wo Öffnen nichts ändert', () => {
 		// Tiefkühl hat keine Geöffnet-Haltbarkeit — aufgetaute Erbsen sind ein
 		// anderes Problem als eine offene Dose.
 		const peas = db.select().from(product).where(eq(product.name, 'Erbsen TK')).get()!;
-		const id = addStock(db, { productId: peas.id, quantity: 750, location: 'freezer' });
+		const id = addStock(db, userId, { productId: peas.id, quantity: 750, location: 'freezer' });
 		const before = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!.bestBefore;
 
-		openOne(db, id);
+		openOne(db, userId, id);
 		const after = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 		expect(after.bestBefore).toEqual(before);
 		expect(after.fillLevel).toBe(100);
@@ -437,7 +438,7 @@ describe('updateStockItem', () => {
 		const item = db.select().from(stockItem).get()!;
 		expect(item.consumedAt).toBeNull();
 
-		updateStockItem(db, item.id, { quantity: 0 });
+		updateStockItem(db, userId, item.id, { quantity: 0 });
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.quantity).toBe(0);
@@ -447,18 +448,18 @@ describe('updateStockItem', () => {
 	it('lässt consumedAt unangetastet, wenn die Menge über 0 bleibt', () => {
 		const item = db.select().from(stockItem).get()!;
 
-		updateStockItem(db, item.id, { quantity: 3 });
+		updateStockItem(db, userId, item.id, { quantity: 3 });
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, item.id)).get();
 		expect(row?.consumedAt).toBeNull();
 	});
 
 	it('setzt die Startmenge neu — im Sheet korrigiert man den Kauf, nicht die Entnahme', () => {
-		const eggs = listStock(db).find((r) => r.name === 'Eier')!;
+		const eggs = listStock(db, userId).find((r) => r.name === 'Eier')!;
 		expect(eggs.initialQuantity).toBe(10);
 
 		// „Waren doch zwölf" ist eine Korrektur der Packung, keine Entnahme.
-		updateStockItem(db, eggs.id, { quantity: 12 });
+		updateStockItem(db, userId, eggs.id, { quantity: 12 });
 
 		const row = db.select().from(stockItem).where(eq(stockItem.id, eggs.id)).get();
 		expect(row?.initialQuantity).toBe(12);
@@ -468,10 +469,10 @@ describe('updateStockItem', () => {
 describe('Standardmenge aus dem letzten Kauf', () => {
 	it('übernimmt Menge und Einheit des letzten Postens', () => {
 		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
-		addStock(db, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
+		addStock(db, userId, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
 
 		// Ohne Angabe: die App weiß aus dem Verhalten, dass Gouda 400 g sind.
-		const id = addStock(db, { productId: cheese.id, location: 'fridge' });
+		const id = addStock(db, userId, { productId: cheese.id, location: 'fridge' });
 		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 
 		expect(row.quantity).toBe(400);
@@ -480,19 +481,50 @@ describe('Standardmenge aus dem letzten Kauf', () => {
 
 	it('fällt ohne Kaufhistorie auf eine Einheit zurück', () => {
 		const id = findOrCreateProduct(db, 'Nie gekauft');
-		expect(lastPurchase(db, id)).toBeNull();
+		expect(lastPurchase(db, userId, id)).toBeNull();
 
-		const stockId = addStock(db, { productId: id, location: 'pantry' });
+		const stockId = addStock(db, userId, { productId: id, location: 'pantry' });
 		const row = db.select().from(stockItem).where(eq(stockItem.id, stockId)).get()!;
 		expect(row.quantity).toBe(1);
 	});
 
 	it('eine ausdrückliche Angabe schlägt den Verlauf', () => {
 		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
-		addStock(db, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
+		addStock(db, userId, { productId: cheese.id, quantity: 400, unit: 'g', location: 'fridge' });
 
-		const id = addStock(db, { productId: cheese.id, quantity: 150, unit: 'g', location: 'fridge' });
+		const id = addStock(db, userId, {
+			productId: cheese.id,
+			quantity: 150,
+			unit: 'g',
+			location: 'fridge'
+		});
 		const row = db.select().from(stockItem).where(eq(stockItem.id, id)).get()!;
 		expect(row.quantity).toBe(150);
+	});
+});
+
+describe('Nutzertrennung (M11)', () => {
+	it('zeigt jedem Nutzer nur den eigenen Bestand', () => {
+		const otherUserId = db
+			.insert(user)
+			.values({ name: 'Zweite Person' })
+			.returning({ id: user.id })
+			.get().id;
+
+		const cheese = db.select().from(product).where(eq(product.name, 'Gouda')).get()!;
+		const theirItemId = addStock(db, otherUserId, {
+			productId: cheese.id,
+			quantity: 1,
+			location: 'fridge'
+		});
+
+		const mine = listStock(db, userId);
+		const theirs = listStock(db, otherUserId);
+
+		// Der Testnutzer aus seedDevData sieht den Posten der zweiten Person nicht …
+		expect(mine.some((r) => r.id === theirItemId)).toBe(false);
+		expect(mine.length).toBeGreaterThan(0);
+		// … die zweite Person sieht ausschließlich ihren einen Posten.
+		expect(theirs).toEqual([expect.objectContaining({ id: theirItemId, productId: cheese.id })]);
 	});
 });

@@ -31,7 +31,7 @@ export type StockRow = {
  * Posten ohne MHD landen hinten, nicht vorn — NULL sortiert in SQLite sonst
  * zuerst und würde die Dringlichkeitsliste anführen, ohne dringend zu sein.
  */
-export function listStock(db: Db, location?: Location): StockRow[] {
+export function listStock(db: Db, userId: number, location?: Location): StockRow[] {
 	return db
 		.select({
 			id: stockItem.id,
@@ -53,19 +53,23 @@ export function listStock(db: Db, location?: Location): StockRow[] {
 		.innerJoin(category, eq(product.categoryId, category.id))
 		.where(
 			location
-				? and(isNull(stockItem.consumedAt), eq(stockItem.location, location))
-				: isNull(stockItem.consumedAt)
+				? and(
+						eq(stockItem.userId, userId),
+						isNull(stockItem.consumedAt),
+						eq(stockItem.location, location)
+					)
+				: and(eq(stockItem.userId, userId), isNull(stockItem.consumedAt))
 		)
 		.orderBy(sql`${stockItem.bestBefore} is null`, asc(stockItem.bestBefore), asc(product.name))
 		.all();
 }
 
 /** Zählt offene Posten je Ort — für die Zahlen an den Tabs. */
-export function countByLocation(db: Db): Record<Location, number> {
+export function countByLocation(db: Db, userId: number): Record<Location, number> {
 	const rows = db
 		.select({ location: stockItem.location, n: count() })
 		.from(stockItem)
-		.where(isNull(stockItem.consumedAt))
+		.where(and(eq(stockItem.userId, userId), isNull(stockItem.consumedAt)))
 		.groupBy(stockItem.location)
 		.all();
 
@@ -81,11 +85,11 @@ export function countByLocation(db: Db): Record<Location, number> {
  * „nichts Dringendes" ohne dafür extra hinzutippen zu müssen, und der Anstoß,
  * wenn doch etwas brennt.
  */
-export function countUrgent(db: Db, now: Date = new Date()): number {
+export function countUrgent(db: Db, userId: number, now: Date = new Date()): number {
 	const rows = db
 		.select({ bestBefore: stockItem.bestBefore })
 		.from(stockItem)
-		.where(isNull(stockItem.consumedAt))
+		.where(and(eq(stockItem.userId, userId), isNull(stockItem.consumedAt)))
 		.all();
 	return rows.filter(
 		(row) =>
@@ -101,8 +105,12 @@ export function countUrgent(db: Db, now: Date = new Date()): number {
  * restlichen Eiern zehn dazulegt, hat fünfzehn von fünfzehn und keinen Balken
  * bei 150 %.
  */
-export function adjustQuantity(db: Db, id: number, delta: number): void {
-	const item = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
+export function adjustQuantity(db: Db, userId: number, id: number, delta: number): void {
+	const item = db
+		.select()
+		.from(stockItem)
+		.where(and(eq(stockItem.id, id), eq(stockItem.userId, userId)))
+		.get();
 	if (!item || item.consumedAt) return;
 
 	const next = Math.max(0, item.quantity + delta);
@@ -119,8 +127,12 @@ export function adjustQuantity(db: Db, id: number, delta: number): void {
 /** Der Zustand vor dem Aufbrauchen, damit Undo ihn zurückschreiben kann. */
 export type ConsumedSnapshot = { id: number; quantity: number; fillLevel: number | null };
 
-export function consume(db: Db, id: number): ConsumedSnapshot | null {
-	const item = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
+export function consume(db: Db, userId: number, id: number): ConsumedSnapshot | null {
+	const item = db
+		.select()
+		.from(stockItem)
+		.where(and(eq(stockItem.id, id), eq(stockItem.userId, userId)))
+		.get();
 	if (!item || item.consumedAt) return null;
 
 	db.update(stockItem).set({ consumedAt: new Date() }).where(eq(stockItem.id, id)).run();
@@ -132,17 +144,21 @@ export function consume(db: Db, id: number): ConsumedSnapshot | null {
  *
  * Statt eines Bestätigungsdialogs, der jede einzelne Entnahme einen Tap kostet:
  * die Aktion passiert sofort, und nur im seltenen Fehlerfall tippt man einmal
- * mehr.
+ * mehr. `userId` in der WHERE-Bedingung, damit ein Undo-Formular mit einer ID
+ * aus einer anderen Nutzer-Session keine fremde Zeile anfasst.
  */
-export function undoConsume(db: Db, snapshot: ConsumedSnapshot): void {
+export function undoConsume(db: Db, userId: number, snapshot: ConsumedSnapshot): void {
 	db.update(stockItem)
 		.set({ consumedAt: null, quantity: snapshot.quantity, fillLevel: snapshot.fillLevel })
-		.where(eq(stockItem.id, snapshot.id))
+		.where(and(eq(stockItem.id, snapshot.id), eq(stockItem.userId, userId)))
 		.run();
 }
 
-export function setFillLevel(db: Db, id: number, level: FillLevel | null): void {
-	db.update(stockItem).set({ fillLevel: level }).where(eq(stockItem.id, id)).run();
+export function setFillLevel(db: Db, userId: number, id: number, level: FillLevel | null): void {
+	db.update(stockItem)
+		.set({ fillLevel: level })
+		.where(and(eq(stockItem.id, id), eq(stockItem.userId, userId)))
+		.run();
 }
 
 /**
@@ -177,8 +193,12 @@ function bestBeforeAfterOpening(db: Db, productId: number, current: Date | null)
  *
  * Gibt die ID des geöffneten Postens zurück, oder null, wenn nichts zu öffnen war.
  */
-export function openOne(db: Db, id: number): number | null {
-	const item = db.select().from(stockItem).where(eq(stockItem.id, id)).get();
+export function openOne(db: Db, userId: number, id: number): number | null {
+	const item = db
+		.select()
+		.from(stockItem)
+		.where(and(eq(stockItem.id, id), eq(stockItem.userId, userId)))
+		.get();
 	if (!item || item.consumedAt || item.fillLevel !== null) return null;
 
 	const bestBefore = bestBeforeAfterOpening(db, item.productId, item.bestBefore);
@@ -198,6 +218,7 @@ export function openOne(db: Db, id: number): number | null {
 	return db
 		.insert(stockItem)
 		.values({
+			userId: item.userId,
 			productId: item.productId,
 			quantity: 1,
 			// Das abgeteilte Stück fängt bei eins an; der Restposten behält seine
@@ -230,6 +251,7 @@ export function openOne(db: Db, id: number): number | null {
  */
 export function updateStockItem(
 	db: Db,
+	userId: number,
 	id: number,
 	patch: { location?: Location; unit?: Unit; quantity?: number; bestBefore?: Date | null }
 ): void {
@@ -248,7 +270,10 @@ export function updateStockItem(
 		set.bestBeforeIsEstimated = false;
 	}
 	if (Object.keys(set).length === 0) return;
-	db.update(stockItem).set(set).where(eq(stockItem.id, id)).run();
+	db.update(stockItem)
+		.set(set)
+		.where(and(eq(stockItem.id, id), eq(stockItem.userId, userId)))
+		.run();
 }
 
 /**
@@ -267,22 +292,28 @@ export function updateProductCategory(db: Db, productId: number, categoryId: num
  * Produkte nach Kaufhäufigkeit — die Vorlage für die Chips beim Hinzufügen.
  * Das meiste, was nachgetragen wird, wurde schon zwanzigmal gekauft.
  */
-export function frequentProducts(db: Db, limit = 12) {
-	return db
-		.select({
-			id: product.id,
-			name: product.name,
-			emoji: category.emoji,
-			unit: product.defaultUnit,
-			purchases: count(stockItem.id)
-		})
-		.from(product)
-		.innerJoin(category, eq(product.categoryId, category.id))
-		.leftJoin(stockItem, eq(stockItem.productId, product.id))
-		.groupBy(product.id)
-		.orderBy(desc(count(stockItem.id)), asc(product.name))
-		.limit(limit)
-		.all();
+export function frequentProducts(db: Db, userId: number, limit = 12) {
+	return (
+		db
+			.select({
+				id: product.id,
+				name: product.name,
+				emoji: category.emoji,
+				unit: product.defaultUnit,
+				purchases: count(stockItem.id)
+			})
+			.from(product)
+			.innerJoin(category, eq(product.categoryId, category.id))
+			// Der Join-Bedingung, nicht dem WHERE, sitzt die Nutzer-Einschränkung:
+			// so bleiben auch Produkte in der Liste (mit Zähler 0), die dieser
+			// Nutzer noch nie gekauft hat — „häufig gekauft" ist pro Person, aber
+			// der Produktkatalog bleibt geteilt.
+			.leftJoin(stockItem, and(eq(stockItem.productId, product.id), eq(stockItem.userId, userId)))
+			.groupBy(product.id)
+			.orderBy(desc(count(stockItem.id)), asc(product.name))
+			.limit(limit)
+			.all()
+	);
 }
 
 export function searchProducts(db: Db, term: string, limit = 20) {
@@ -322,12 +353,13 @@ function shelfLifeFor(db: DbOrTx, productId: number): number {
  */
 export function lastPurchase(
 	db: DbOrTx,
+	userId: number,
 	productId: number
 ): { quantity: number; unit: Unit } | null {
 	const row = db
 		.select({ quantity: stockItem.quantity, unit: stockItem.unit })
 		.from(stockItem)
-		.where(eq(stockItem.productId, productId))
+		.where(and(eq(stockItem.productId, productId), eq(stockItem.userId, userId)))
 		.orderBy(desc(stockItem.id))
 		.get();
 	return row ?? null;
@@ -336,6 +368,7 @@ export function lastPurchase(
 /** Legt einen Bestandsposten an und schätzt sein MHD aus der Kategorie. */
 export function addStock(
 	db: DbOrTx,
+	userId: number,
 	input: {
 		productId: number;
 		quantity?: number;
@@ -347,7 +380,7 @@ export function addStock(
 ): number {
 	const purchasedAt = new Date();
 	const days = shelfLifeFor(db, input.productId);
-	const last = lastPurchase(db, input.productId);
+	const last = lastPurchase(db, userId, input.productId);
 
 	const quantity = input.quantity ?? last?.quantity ?? 1;
 	const unit =
@@ -360,6 +393,7 @@ export function addStock(
 	return db
 		.insert(stockItem)
 		.values({
+			userId,
 			productId: input.productId,
 			quantity,
 			// Ein frischer Posten ist per Definition voll.

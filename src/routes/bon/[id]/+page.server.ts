@@ -11,8 +11,8 @@ function parseId(value: string): number {
 	return id;
 }
 
-export const load: PageServerLoad = ({ params }) => {
-	const review = loadReceiptReview(db, parseId(params.id));
+export const load: PageServerLoad = ({ params, locals }) => {
+	const review = loadReceiptReview(db, locals.userId, parseId(params.id));
 	if (!review) error(404, 'Kein solcher Bon');
 	if (review.status !== 'pending') redirect(303, '/');
 
@@ -68,18 +68,18 @@ function parseDecisions(raw: FormDataEntryValue | null) {
 }
 
 export const actions: Actions = {
-	confirm: async ({ request, params }) => {
+	confirm: async ({ request, params, locals }) => {
 		const data = await request.formData();
 		const decisions = parseDecisions(data.get('lines'));
 		if (!decisions) return fail(400, { message: 'Die Zeilen kamen unvollständig an.' });
 
-		const { added } = confirmReceipt(db, parseId(params.id), decisions);
+		const { added } = confirmReceipt(db, locals.userId, parseId(params.id), decisions);
 		redirect(303, added > 0 ? `/?eingelagert=${added}` : '/');
 	},
 
 	/** Der ganze Bon war nichts — kein Dialog davor, der Bon bleibt in der DB. */
-	discard: async ({ params }) => {
-		discardReceipt(db, parseId(params.id));
+	discard: async ({ params, locals }) => {
+		discardReceipt(db, locals.userId, parseId(params.id));
 		redirect(303, '/bon');
 	}
 };

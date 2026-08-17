@@ -33,8 +33,8 @@ function receiptDir(): string {
 	return join(dirname(env.DATABASE_URL ?? 'data/kitchen.db'), 'receipts');
 }
 
-export const load: PageServerLoad = () => {
-	return { pending: pendingReceipts(db) };
+export const load: PageServerLoad = ({ locals }) => {
+	return { pending: pendingReceipts(db, locals.userId) };
 };
 
 export const actions: Actions = {
@@ -45,7 +45,7 @@ export const actions: Actions = {
 	 * schief, bleiben Fotos und Rohantwort unter `discarded` liegen. Genau die
 	 * Fälle braucht man später, um den Prompt zu verbessern.
 	 */
-	analyze: async ({ request }) => {
+	analyze: async ({ request, locals }) => {
 		const data = await request.formData();
 		const files = data.getAll('images').filter((entry): entry is File => entry instanceof File);
 
@@ -61,7 +61,7 @@ export const actions: Actions = {
 			if (file.size === 0) return fail(400, { message: 'Aufnahme ist leer.' });
 		}
 
-		const receiptId = createPendingReceipt(db);
+		const receiptId = createPendingReceipt(db, locals.userId);
 		const images: ReceiptImage[] = [];
 
 		// Voller Datenträger oder fehlende Rechte im Container: die Aufnahmen
@@ -81,7 +81,7 @@ export const actions: Actions = {
 			}
 		} catch (cause) {
 			console.error('[bon] Aufnahme nicht speicherbar', cause);
-			discardReceipt(db, receiptId);
+			discardReceipt(db, locals.userId, receiptId);
 			return fail(500, { message: 'Die Aufnahme ließ sich nicht speichern.' });
 		}
 
@@ -89,7 +89,7 @@ export const actions: Actions = {
 		try {
 			analysis = await analyzeReceipt(images, categoryNames(db));
 		} catch (error) {
-			discardReceipt(db, receiptId);
+			discardReceipt(db, locals.userId, receiptId);
 			const known = error instanceof ReceiptAiError;
 			if (!known) console.error('[bon] unerwarteter Fehler', error);
 			return fail(known && (error as ReceiptAiError).retryable ? 503 : 502, {
@@ -100,7 +100,7 @@ export const actions: Actions = {
 		if (analysis.receipt.lines.length === 0) {
 			// Rohantwort behalten: „nichts gefunden" ist der Fall, an dem sich der
 			// Prompt verbessern lässt.
-			discardReceipt(db, receiptId, analysis.raw);
+			discardReceipt(db, locals.userId, receiptId, analysis.raw);
 			return fail(422, {
 				message: 'Keine Bonzeile lesbar. Näher ran, mehr Licht, notfalls in zwei Aufnahmen.'
 			});

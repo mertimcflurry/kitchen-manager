@@ -28,15 +28,19 @@ function form(fields: Record<string, string>): Request {
 }
 
 function event(fields: Record<string, string>) {
-	return { request: form(fields) } as Parameters<(typeof stockActions)['adjust']>[0];
+	return {
+		request: form(fields),
+		locals: { userId }
+	} as Parameters<(typeof stockActions)['adjust']>[0];
 }
 
 let milkId: number;
+let userId: number;
 beforeEach(() => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
 	seedCategories(db);
-	seedDevData(db);
+	({ userId } = seedDevData(db));
 	milkId = db.select().from(stockItem).all()[0].id;
 });
 

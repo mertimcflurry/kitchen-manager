@@ -14,14 +14,17 @@ import {
 	saveParsedLines
 } from './receipts';
 import { seedCategories } from './seed';
+import { createUser } from './users';
 import { addTextToList, listShopping } from './shopping';
 import { category, product, productAlias, receipt, receiptLine, stockItem } from './schema';
 
 let db: Db;
+let userId: number;
 beforeEach(() => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
 	seedCategories(db);
+	userId = createUser(db, 'Test')!;
 });
 
 const PARSED: ParsedReceipt = {
@@ -51,7 +54,7 @@ const PARSED: ParsedReceipt = {
 };
 
 function seedReceipt(): number {
-	const id = createPendingReceipt(db);
+	const id = createPendingReceipt(db, userId);
 	saveParsedLines(db, id, PARSED);
 	return id;
 }
@@ -59,7 +62,7 @@ function seedReceipt(): number {
 describe('saveParsedLines', () => {
 	it('schreibt Kopf und Zeilen weg', () => {
 		const id = seedReceipt();
-		const review = loadReceiptReview(db, id)!;
+		const review = loadReceiptReview(db, userId, id)!;
 
 		expect(review.store).toBe('REWE');
 		expect(review.lines).toHaveLength(2);
@@ -69,7 +72,7 @@ describe('saveParsedLines', () => {
 
 	it('merkt sich die Kategorie des Modells für das spätere Anlegen', () => {
 		const id = seedReceipt();
-		expect(loadReceiptReview(db, id)!.lines[0].category).toBe('Tofu & Fleischersatz');
+		expect(loadReceiptReview(db, userId, id)!.lines[0].category).toBe('Tofu & Fleischersatz');
 	});
 
 	it('löst bekannte Bon-Bezeichnungen über die Alias-Tabelle auf', () => {
@@ -80,7 +83,7 @@ describe('saveParsedLines', () => {
 			.get().id;
 		rememberAlias(db, 'BIO-TOFU NAT 400G', productId);
 
-		const review = loadReceiptReview(db, seedReceipt())!;
+		const review = loadReceiptReview(db, userId, seedReceipt())!;
 		expect(review.lines[0].known).toBe(true);
 		// Was einmal bestätigt wurde, gilt als sicher — auch wenn das Modell zweifelt.
 		expect(review.lines[0].confidence).toBe('high');
@@ -90,7 +93,7 @@ describe('saveParsedLines', () => {
 
 describe('confirmReceipt', () => {
 	function decide(id: number, overrides: Partial<{ keep: boolean; quantity: number }> = {}) {
-		return loadReceiptReview(db, id)!.lines.map((line) => ({
+		return loadReceiptReview(db, userId, id)!.lines.map((line) => ({
 			id: line.id,
 			name: line.name,
 			quantity: overrides.quantity ?? line.quantity,
@@ -102,7 +105,7 @@ describe('confirmReceipt', () => {
 
 	it('legt Produkte in der vorgeschlagenen Kategorie an, nicht in Sonstiges', () => {
 		const id = seedReceipt();
-		confirmReceipt(db, id, decide(id));
+		confirmReceipt(db, userId, id, decide(id));
 
 		const row = db
 			.select({ categoryName: category.name })
@@ -115,7 +118,7 @@ describe('confirmReceipt', () => {
 
 	it('bucht die Zeilen als Bestand mit Herkunft ein', () => {
 		const id = seedReceipt();
-		expect(confirmReceipt(db, id, decide(id))).toEqual({ added: 2, rejected: 0 });
+		expect(confirmReceipt(db, userId, id, decide(id))).toEqual({ added: 2, rejected: 0 });
 
 		const items = db.select().from(stockItem).all();
 		expect(items).toHaveLength(2);
@@ -124,22 +127,22 @@ describe('confirmReceipt', () => {
 	});
 
 	it('hakt ab, was auf der Einkaufsliste stand', () => {
-		addTextToList(db, 'Tofu natur');
-		addTextToList(db, 'Zahnpasta');
+		addTextToList(db, userId, 'Tofu natur');
+		addTextToList(db, userId, 'Zahnpasta');
 
 		const id = seedReceipt();
-		confirmReceipt(db, id, decide(id));
+		confirmReceipt(db, userId, id, decide(id));
 
 		// Der Bon weiß, was im Wagen lag — die Liste muss man dafür nicht
 		// zweimal durchgehen. Was nicht auf dem Bon stand, bleibt offen.
-		const list = listShopping(db);
+		const list = listShopping(db, userId);
 		expect(list.done.map((row) => row.name)).toEqual(['Tofu natur']);
 		expect(list.open.map((row) => row.name)).toEqual(['Zahnpasta']);
 	});
 
 	it('lernt für jede bestätigte Zeile einen Alias', () => {
 		const id = seedReceipt();
-		confirmReceipt(db, id, decide(id));
+		confirmReceipt(db, userId, id, decide(id));
 
 		expect(findAlias(db, 'bio tofu nat 400 g')?.name).toBe('Tofu natur');
 		expect(db.select().from(productAlias).all()).toHaveLength(2);
@@ -147,7 +150,10 @@ describe('confirmReceipt', () => {
 
 	it('legt verworfene Zeilen weder an noch als Alias ab', () => {
 		const id = seedReceipt();
-		expect(confirmReceipt(db, id, decide(id, { keep: false }))).toEqual({ added: 0, rejected: 2 });
+		expect(confirmReceipt(db, userId, id, decide(id, { keep: false }))).toEqual({
+			added: 0,
+			rejected: 2
+		});
 
 		expect(db.select().from(stockItem).all()).toHaveLength(0);
 		expect(db.select().from(productAlias).all()).toHaveLength(0);
@@ -155,7 +161,7 @@ describe('confirmReceipt', () => {
 
 	it('übernimmt die korrigierte Menge, nicht die gelesene', () => {
 		const id = seedReceipt();
-		confirmReceipt(db, id, decide(id, { quantity: 5 }));
+		confirmReceipt(db, userId, id, decide(id, { quantity: 5 }));
 		expect(
 			db
 				.select()
@@ -167,7 +173,7 @@ describe('confirmReceipt', () => {
 
 	it('lässt keine Zeile offen zurück und schließt den Bon ab', () => {
 		const id = seedReceipt();
-		confirmReceipt(db, id, [decide(id)[0]]);
+		confirmReceipt(db, userId, id, [decide(id)[0]]);
 
 		const open = db.select().from(receiptLine).where(eq(receiptLine.status, 'pending')).all();
 		expect(open).toHaveLength(0);
@@ -177,17 +183,17 @@ describe('confirmReceipt', () => {
 	it('bucht einen zweiten Aufruf nicht noch einmal ein', () => {
 		const id = seedReceipt();
 		const decisions = decide(id);
-		confirmReceipt(db, id, decisions);
-		expect(confirmReceipt(db, id, decisions)).toEqual({ added: 0, rejected: 0 });
+		confirmReceipt(db, userId, id, decisions);
+		expect(confirmReceipt(db, userId, id, decisions)).toEqual({ added: 0, rejected: 0 });
 		expect(db.select().from(stockItem).all()).toHaveLength(2);
 	});
 
 	it('ordnet eine bekannte Bezeichnung dem gelernten Produkt zu, statt ein neues anzulegen', () => {
 		const first = seedReceipt();
-		confirmReceipt(db, first, decide(first));
+		confirmReceipt(db, userId, first, decide(first));
 
 		const second = seedReceipt();
-		confirmReceipt(db, second, decide(second));
+		confirmReceipt(db, userId, second, decide(second));
 
 		expect(db.select().from(product).all()).toHaveLength(2);
 		expect(db.select().from(stockItem).all()).toHaveLength(4);
@@ -197,16 +203,16 @@ describe('confirmReceipt', () => {
 describe('pendingReceipts', () => {
 	it('zeigt nur ungeprüfte Bons mit Zeilen', () => {
 		const withLines = seedReceipt();
-		createPendingReceipt(db); // ohne Zeilen — nichts zu prüfen
+		createPendingReceipt(db, userId); // ohne Zeilen — nichts zu prüfen
 
-		expect(pendingReceipts(db)).toEqual([{ id: withLines, store: 'REWE', lines: 2 }]);
+		expect(pendingReceipts(db, userId)).toEqual([{ id: withLines, store: 'REWE', lines: 2 }]);
 	});
 
 	it('vergisst verworfene Bons', () => {
 		const id = seedReceipt();
-		discardReceipt(db, id, '{"lines":[]}');
+		discardReceipt(db, userId, id, '{"lines":[]}');
 
-		expect(pendingReceipts(db)).toHaveLength(0);
+		expect(pendingReceipts(db, userId)).toHaveLength(0);
 		const row = db.select().from(receipt).where(eq(receipt.id, id)).get();
 		// Die Rohantwort bleibt: genau an den Fehlschlägen lässt sich der Prompt schärfen.
 		expect(row?.rawResponse).toBe('{"lines":[]}');
@@ -215,15 +221,16 @@ describe('pendingReceipts', () => {
 
 describe('loadReceiptReview', () => {
 	it('gibt für einen unbekannten Bon nichts zurück', () => {
-		expect(loadReceiptReview(db, 999)).toBeNull();
+		expect(loadReceiptReview(db, userId, 999)).toBeNull();
 	});
 
 	it('zeigt nach dem Bestätigen keine offenen Zeilen mehr', () => {
 		const id = seedReceipt();
 		confirmReceipt(
 			db,
+			userId,
 			id,
-			loadReceiptReview(db, id)!.lines.map((line) => ({
+			loadReceiptReview(db, userId, id)!.lines.map((line) => ({
 				id: line.id,
 				name: line.name,
 				quantity: line.quantity,
@@ -233,7 +240,7 @@ describe('loadReceiptReview', () => {
 			}))
 		);
 
-		expect(loadReceiptReview(db, id)!.lines).toHaveLength(0);
+		expect(loadReceiptReview(db, userId, id)!.lines).toHaveLength(0);
 		expect(db.select().from(stockItem).where(isNull(stockItem.consumedAt)).all()[0].location).toBe(
 			'pantry'
 		);

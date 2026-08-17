@@ -31,8 +31,12 @@ function parsePurchasedAt(value: string): Date {
  * um den Prompt zu verbessern — und genau die wären weg, wenn der Bon erst
  * nach Erfolg entstünde.
  */
-export function createPendingReceipt(db: Db): number {
-	return db.insert(receipt).values({ status: 'pending' }).returning({ id: receipt.id }).get().id;
+export function createPendingReceipt(db: Db, userId: number): number {
+	return db
+		.insert(receipt)
+		.values({ userId, status: 'pending' })
+		.returning({ id: receipt.id })
+		.get().id;
 }
 
 export function addReceiptImage(db: Db, receiptId: number, path: string, sortOrder: number): void {
@@ -58,10 +62,15 @@ export function deleteReceiptImages(db: Db, ids: number[]): void {
 	db.delete(receiptImage).where(inArray(receiptImage.id, ids)).run();
 }
 
-export function discardReceipt(db: Db, receiptId: number, rawResponse?: string): void {
+export function discardReceipt(
+	db: Db,
+	userId: number,
+	receiptId: number,
+	rawResponse?: string
+): void {
 	db.update(receipt)
 		.set({ status: 'discarded', ...(rawResponse === undefined ? {} : { rawResponse }) })
-		.where(eq(receipt.id, receiptId))
+		.where(and(eq(receipt.id, receiptId), eq(receipt.userId, userId)))
 		.run();
 }
 
@@ -162,8 +171,12 @@ export type ReceiptReview = {
 };
 
 /** Alles, was der Prüf-Screen braucht — ein Bon mit seinen offenen Zeilen. */
-export function loadReceiptReview(db: Db, receiptId: number): ReceiptReview | null {
-	const head = db.select().from(receipt).where(eq(receipt.id, receiptId)).get();
+export function loadReceiptReview(db: Db, userId: number, receiptId: number): ReceiptReview | null {
+	const head = db
+		.select()
+		.from(receipt)
+		.where(and(eq(receipt.id, receiptId), eq(receipt.userId, userId)))
+		.get();
 	if (!head) return null;
 
 	const rows = db
@@ -195,7 +208,8 @@ export function loadReceiptReview(db: Db, receiptId: number): ReceiptReview | nu
 
 /** Wie viele Bons noch auf Prüfung warten — für den Hinweis auf der Bon-Seite. */
 export function pendingReceipts(
-	db: Db
+	db: Db,
+	userId: number
 ): Array<{ id: number; store: string | null; lines: number }> {
 	return db
 		.select({
@@ -205,7 +219,7 @@ export function pendingReceipts(
 		})
 		.from(receipt)
 		.leftJoin(receiptLine, eq(receiptLine.receiptId, receipt.id))
-		.where(eq(receipt.status, 'pending'))
+		.where(and(eq(receipt.userId, userId), eq(receipt.status, 'pending')))
 		.groupBy(receipt.id)
 		.having(sql`count(${receiptLine.id}) > 0`)
 		.orderBy(asc(receipt.id))
@@ -233,11 +247,16 @@ export type LineDecision = {
  */
 export function confirmReceipt(
 	db: Db,
+	userId: number,
 	receiptId: number,
 	decisions: LineDecision[]
 ): { added: number; rejected: number } {
 	return db.transaction((tx) => {
-		const head = tx.select().from(receipt).where(eq(receipt.id, receiptId)).get();
+		const head = tx
+			.select()
+			.from(receipt)
+			.where(and(eq(receipt.id, receiptId), eq(receipt.userId, userId)))
+			.get();
 		if (!head || head.status !== 'pending') return { added: 0, rejected: 0 };
 
 		const stored = new Map(
@@ -268,7 +287,7 @@ export function confirmReceipt(
 			const productId =
 				row.productId ?? findOrCreateProduct(tx, decision.name, row.parsedCategory ?? undefined);
 
-			addStock(tx, {
+			addStock(tx, userId, {
 				productId,
 				quantity: decision.quantity,
 				unit: decision.unit,
@@ -283,7 +302,7 @@ export function confirmReceipt(
 
 			rememberAlias(tx, row.rawText, productId, head.store ?? undefined);
 			// Was im Wagen lag, muss man zu Hause nicht noch abhaken.
-			markProductBought(tx, productId, decision.name);
+			markProductBought(tx, userId, productId, decision.name);
 			added++;
 		}
 

@@ -26,7 +26,7 @@ export type ShoppingRow = {
  * und was man zuletzt vermisst hat, steht dann unten — dieselbe Reihenfolge,
  * in der man daran gedacht hat.
  */
-export function listShopping(db: Db): { open: ShoppingRow[]; done: ShoppingRow[] } {
+export function listShopping(db: Db, userId: number): { open: ShoppingRow[]; done: ShoppingRow[] } {
 	const rows = db
 		.select({
 			id: shoppingListItem.id,
@@ -39,6 +39,7 @@ export function listShopping(db: Db): { open: ShoppingRow[]; done: ShoppingRow[]
 		.from(shoppingListItem)
 		.leftJoin(product, eq(shoppingListItem.productId, product.id))
 		.leftJoin(category, eq(product.categoryId, category.id))
+		.where(eq(shoppingListItem.userId, userId))
 		.orderBy(asc(shoppingListItem.id))
 		.all();
 
@@ -77,19 +78,26 @@ function normalize(text: string): string {
  */
 export function addProductToList(
 	db: Db,
+	userId: number,
 	productId: number,
 	source: 'manual' | 'suggested' = 'manual'
 ): number {
 	const existing = db
 		.select({ id: shoppingListItem.id })
 		.from(shoppingListItem)
-		.where(and(eq(shoppingListItem.productId, productId), eq(shoppingListItem.isDone, false)))
+		.where(
+			and(
+				eq(shoppingListItem.userId, userId),
+				eq(shoppingListItem.productId, productId),
+				eq(shoppingListItem.isDone, false)
+			)
+		)
 		.get();
 	if (existing) return existing.id;
 
 	return db
 		.insert(shoppingListItem)
-		.values({ productId, source })
+		.values({ userId, productId, source })
 		.returning({ id: shoppingListItem.id })
 		.get().id;
 }
@@ -101,7 +109,7 @@ export function addProductToList(
  * dann trägt die Zeile das Emoji ihrer Kategorie und der Eintrag zählt später
  * für die Vorschläge mit.
  */
-export function addTextToList(db: Db, text: string): number | null {
+export function addTextToList(db: Db, userId: number, text: string): number | null {
 	const trimmed = text.trim().slice(0, 80);
 	if (trimmed === '') return null;
 
@@ -110,19 +118,25 @@ export function addTextToList(db: Db, text: string): number | null {
 		.from(product)
 		.where(sql`lower(${product.name}) = ${normalize(trimmed)}`)
 		.get();
-	if (known) return addProductToList(db, known.id);
+	if (known) return addProductToList(db, userId, known.id);
 
 	const duplicate = db
 		.select({ id: shoppingListItem.id, freeText: shoppingListItem.freeText })
 		.from(shoppingListItem)
-		.where(and(isNull(shoppingListItem.productId), eq(shoppingListItem.isDone, false)))
+		.where(
+			and(
+				eq(shoppingListItem.userId, userId),
+				isNull(shoppingListItem.productId),
+				eq(shoppingListItem.isDone, false)
+			)
+		)
 		.all()
 		.find((row) => normalize(row.freeText ?? '') === normalize(trimmed));
 	if (duplicate) return duplicate.id;
 
 	return db
 		.insert(shoppingListItem)
-		.values({ freeText: trimmed, source: 'manual' })
+		.values({ userId, freeText: trimmed, source: 'manual' })
 		.returning({ id: shoppingListItem.id })
 		.get().id;
 }
@@ -134,20 +148,25 @@ export function addTextToList(db: Db, text: string): number | null {
  * ist das Undo für den Fehlgriff im Laden — ohne Snackbar, ohne Timer: der
  * Posten steht noch da, ein Tap holt ihn zurück.
  */
-export function setShoppingDone(db: Db, id: number, done: boolean): void {
-	db.update(shoppingListItem).set({ isDone: done }).where(eq(shoppingListItem.id, id)).run();
+export function setShoppingDone(db: Db, userId: number, id: number, done: boolean): void {
+	db.update(shoppingListItem)
+		.set({ isDone: done })
+		.where(and(eq(shoppingListItem.id, id), eq(shoppingListItem.userId, userId)))
+		.run();
 }
 
 /** Räumt das Erledigte weg. Die einzige Stelle, an der wirklich gelöscht wird. */
-export function clearDoneShopping(db: Db): number {
+export function clearDoneShopping(db: Db, userId: number): number {
 	const rows = db
 		.select({ id: shoppingListItem.id })
 		.from(shoppingListItem)
-		.where(eq(shoppingListItem.isDone, true))
+		.where(and(eq(shoppingListItem.userId, userId), eq(shoppingListItem.isDone, true)))
 		.all();
 	if (rows.length === 0) return 0;
 
-	db.delete(shoppingListItem).where(eq(shoppingListItem.isDone, true)).run();
+	db.delete(shoppingListItem)
+		.where(and(eq(shoppingListItem.userId, userId), eq(shoppingListItem.isDone, true)))
+		.run();
 	return rows.length;
 }
 
@@ -165,12 +184,13 @@ export function clearDoneShopping(db: Db): number {
  */
 export function shoppingSuggestions(
 	db: Db,
+	userId: number,
 	limit = 8
 ): Array<{ productId: number; name: string; emoji: string }> {
 	const openStock = db
 		.select({ productId: stockItem.productId })
 		.from(stockItem)
-		.where(isNull(stockItem.consumedAt));
+		.where(and(eq(stockItem.userId, userId), isNull(stockItem.consumedAt)));
 
 	const candidates = db
 		.select({
@@ -180,7 +200,7 @@ export function shoppingSuggestions(
 		})
 		.from(product)
 		.innerJoin(category, eq(product.categoryId, category.id))
-		.innerJoin(stockItem, eq(stockItem.productId, product.id))
+		.innerJoin(stockItem, and(eq(stockItem.productId, product.id), eq(stockItem.userId, userId)))
 		.where(sql`${product.id} not in ${openStock}`)
 		.groupBy(product.id)
 		.having(sql`count(${stockItem.id}) >= 2`)
@@ -196,7 +216,7 @@ export function shoppingSuggestions(
 		db
 			.select({ productId: shoppingListItem.productId })
 			.from(shoppingListItem)
-			.where(eq(shoppingListItem.isDone, false))
+			.where(and(eq(shoppingListItem.userId, userId), eq(shoppingListItem.isDone, false)))
 			.all()
 			.map((row) => row.productId)
 	);
@@ -213,10 +233,21 @@ export function shoppingSuggestions(
  * zum selben Vorgang gehört. Rückgängig ist es wie jedes andere Häkchen: der
  * Posten steht unter „Erledigt" und kommt mit einem Tap zurück.
  */
-export function markProductBought(db: DbOrTx, productId: number, name: string): void {
+export function markProductBought(
+	db: DbOrTx,
+	userId: number,
+	productId: number,
+	name: string
+): void {
 	db.update(shoppingListItem)
 		.set({ isDone: true })
-		.where(and(eq(shoppingListItem.productId, productId), eq(shoppingListItem.isDone, false)))
+		.where(
+			and(
+				eq(shoppingListItem.userId, userId),
+				eq(shoppingListItem.productId, productId),
+				eq(shoppingListItem.isDone, false)
+			)
+		)
 		.run();
 
 	// Und der häufigere Fall: „Zahnpasta" stand als Freitext auf der Liste,
@@ -226,6 +257,7 @@ export function markProductBought(db: DbOrTx, productId: number, name: string): 
 		.set({ isDone: true })
 		.where(
 			and(
+				eq(shoppingListItem.userId, userId),
 				isNull(shoppingListItem.productId),
 				eq(shoppingListItem.isDone, false),
 				sql`lower(${shoppingListItem.freeText}) = ${normalize(name)}`

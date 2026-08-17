@@ -39,28 +39,28 @@ function parseId(data: FormData): number | null {
  */
 export const stockActions = {
 	/** Menge um delta ändern. Bei null gilt der Posten als aufgebraucht. */
-	adjust: async ({ request }) => {
+	adjust: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		const delta = Number(data.get('delta'));
 		if (!id || !Number.isFinite(delta) || delta === 0) return fail(400, { message: 'Ungültig' });
 
-		adjustQuantity(db, id, delta);
+		adjustQuantity(db, locals.userId, id, delta);
 		return { ok: true };
 	},
 
 	/** Aufgebraucht. Gibt den vorherigen Zustand zurück, damit Undo ihn kennt. */
-	consume: async ({ request }) => {
+	consume: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		if (!id) return fail(400, { message: 'Ungültig' });
 
-		const snapshot = consume(db, id);
+		const snapshot = consume(db, locals.userId, id);
 		if (!snapshot) return fail(404, { message: 'Nicht gefunden' });
 		return { ok: true, undo: snapshot };
 	},
 
-	undo: async ({ request }) => {
+	undo: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		const quantity = Number(data.get('quantity'));
@@ -78,39 +78,39 @@ export const stockActions = {
 			fillLevel = level as FillLevel;
 		}
 
-		undoConsume(db, { id, quantity, fillLevel });
+		undoConsume(db, locals.userId, { id, quantity, fillLevel });
 		return { ok: true };
 	},
 
 	/** Eine Einheit öffnen — teilt sie bei Mehrfachpackungen ab. */
-	open: async ({ request }) => {
+	open: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		if (!id) return fail(400, { message: 'Ungültig' });
 
-		const openedId = openOne(db, id);
+		const openedId = openOne(db, locals.userId, id);
 		if (openedId === null) return fail(409, { message: 'Nichts zu öffnen' });
 		return { ok: true, openedId };
 	},
 
-	fill: async ({ request }) => {
+	fill: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		const raw = data.get('level');
 		if (!id) return fail(400, { message: 'Ungültig' });
 
 		if (raw === null || raw === '') {
-			setFillLevel(db, id, null);
+			setFillLevel(db, locals.userId, id, null);
 			return { ok: true };
 		}
 		const level = Number(raw);
 		if (!FILL_LEVELS.includes(level as FillLevel)) return fail(400, { message: 'Ungültige Stufe' });
 
-		setFillLevel(db, id, level as FillLevel);
+		setFillLevel(db, locals.userId, id, level as FillLevel);
 		return { ok: true };
 	},
 
-	update: async ({ request }) => {
+	update: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = parseId(data);
 		if (!id) return fail(400, { message: 'Ungültig' });
@@ -148,7 +148,7 @@ export const stockActions = {
 			}
 		}
 
-		updateStockItem(db, id, { location, bestBefore, quantity, unit });
+		updateStockItem(db, locals.userId, id, { location, bestBefore, quantity, unit });
 		return { ok: true };
 	},
 

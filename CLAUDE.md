@@ -5,9 +5,11 @@ bei Stack- oder Konventionsänderungen mit aktualisieren.
 
 ## Projektziel
 
-Küchen- und Kühlschrankverwaltung als Web-App. **Ein einziger Nutzer**, läuft
-auf einem Raspberry Pi im Heimnetz, erreichbar über Tailscale, **bedient
-hauptsächlich vom Handy im Stehen vor dem Kühlschrank**.
+Küchen- und Kühlschrankverwaltung als Web-App. **Ein Haushalt, mehrere
+mögliche Nutzer, kein Login** — man wählt sich beim ersten Öffnen aus einer
+Liste oder legt sich neu an (siehe „Mehrere Nutzer" unten). Läuft auf einem
+Raspberry Pi im Heimnetz, erreichbar über Tailscale, **bedient hauptsächlich
+vom Handy im Stehen vor dem Kühlschrank**.
 
 Kernfunktionen: Inventar mit Menge und Ort · Kassenbon fotografieren und per KI
 in Einzelposten zerlegen (mit Prüfschritt vor dem Speichern) · MHD über
@@ -122,8 +124,27 @@ Sichern-Knopf kostet bei jeder Korrektur einen Tap und lässt einen im Zweifel,
 ob die Änderung angekommen ist. `change` statt `input`: erst beim Verlassen des
 Feldes, nicht bei jedem Zeichen.
 
-**Kein Auth.** Die App hängt hinter Tailscale. Keine Login-Maske, keine
-Sessions, keine Nutzer-Tabelle.
+**Kein Auth, trotzdem mehrere Nutzer.** Die App hängt hinter Tailscale — das
+ist die einzige Grenze. Keine Login-Maske, keine Passwörter, keine Rollen oder
+Admin-Rechte: wer Zugriff auf die Seite hat, kann sich als jeder bestehende
+Nutzer ausgeben oder einen neuen anlegen, genau wie beim Ändern eines
+Bestandspostens. Eine schlanke `user`-Tabelle (`id`, `name`, `created_at`)
+dient nur der **Trennung der Bestände**, nicht der Zugriffskontrolle. Gemerkt
+wird die Wahl über ein Cookie pro Gerät, nicht über eine Session mit
+Ablaufzeit — einmal wählen, das Handy weiß es dann dauerhaft.
+
+Pro Nutzer getrennt: `stock_item`, `shopping_list_item`, `receipt` (und die
+davon abhängenden `receipt_line`/`receipt_image`) — das ist „der Vorrat" im
+Sinne von CLAUDE.md. **Geteilt bleiben** `category`, `product` und
+`product_alias`: das ist Referenzwissen (welche Kategorien, welche
+MHD-Defaults, welcher Bon-Text meint welches Produkt), kein Bestand, und
+mehrere Personen im selben Haushalt kaufen ohnehin dieselben Produkte. Der
+Rezeptvorschlag (M8) braucht deshalb keine eigene Anpassung — er liest
+`stock_item`, das ist über die Query-Schicht schon nutzerscoped.
+
+Ohne gültiges Cookie leitet `hooks.server.ts` auf `/nutzer` um (Auswahl oder
+Neuanlage), außer man ist schon dort. Kein Onboarding-Assistent, keine
+Pflichtfelder außer dem Namen.
 
 **Migrationen** immer über Drizzle generieren, nie das Schema von Hand am
 laufenden System ändern.
@@ -236,15 +257,20 @@ Wer prüft und gleichzeitig repariert, prüft seine eigene Reparatur nicht mehr.
 
 ## Was NICHT gemacht werden soll
 
-- **Keine Authentifizierung**, keine Nutzerverwaltung, keine Mandantenfähigkeit.
+- **Keine Authentifizierung**, keine Passwörter, keine Sessions mit Ablauf.
+  Mehrere Nutzer ja (siehe „Kein Auth, trotzdem mehrere Nutzer" oben), aber
+  ohne Rollen, ohne Admin, ohne Rechteprüfung — jeder darf alles, inklusive
+  neue Nutzer anlegen.
 - **Kein `export let`**, keine Svelte-4-Patterns, keine Stores für lokalen State.
 - **Keine Client-seitigen KI-Aufrufe**, kein API-Key im Browser.
 - **Kein Barcode-Scanner** — bewusst gestrichen, das Bon-Foto deckt den
   Masseneintrag ab.
 - **Keine Nährwerte, keine Kalorien, keine Rezeptdatenbank** — Rezepte kommen
   vom Modell aus dem Bestand, wir pflegen keine eigene Sammlung.
-- **Keine Multi-Haushalt-Features**, kein Teilen, keine Freigaben.
-- **Kein Postgres, kein separater DB-Container.** SQLite reicht für einen Nutzer.
+- **Keine getrennten Haushalte auf derselben Instanz**, kein Teilen über das
+  eigene Tailnet hinaus. „Mehrere Nutzer" meint Personen im selben Haushalt
+  mit eigenem Bestand, keine Mandantenfähigkeit zwischen Haushalten.
+- **Kein Postgres, kein separater DB-Container.** SQLite reicht für einen Haushalt.
 - **Keine Modals für Standardaktionen.** Menge ändern und „aufgebraucht" müssen
   direkt in der Liste funktionieren.
 - **Kein Push nach `origin`**, solange nicht ausdrücklich freigegeben.

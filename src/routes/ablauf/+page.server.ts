@@ -4,11 +4,11 @@ import { listCategories, listStock } from '$lib/server/db/queries';
 import { stockActions } from '$lib/server/stock-actions';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
 	// Ohne Ort-Argument liefert listStock den gesamten offenen Bestand, bereits
 	// nach Ablauf sortiert (NULL hinten). Das ist genau die Dringlichkeits-
 	// reihenfolge, die dieser Screen braucht — keine zweite Abfrage nötig.
-	const all = listStock(db);
+	const all = listStock(db, locals.userId);
 	const items = all.filter(
 		(i) => i.bestBefore !== null && daysUntil(i.bestBefore) <= EXPIRY_HORIZON_DAYS
 	);

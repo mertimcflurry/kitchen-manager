@@ -6,17 +6,19 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type Db } from './db/client';
 import { addReceiptImage, createPendingReceipt } from './db/receipts';
-import { receipt, receiptImage } from './db/schema';
+import { receipt, receiptImage, user } from './db/schema';
 import { cleanupOldReceiptImages } from './receipt-cleanup';
 
 const NOW = new Date('2026-08-13T12:00:00');
 
 let db: Db;
 let dir: string;
+let userId: number;
 
 beforeEach(async () => {
 	db = createDb(':memory:');
 	migrate(db, { migrationsFolder: 'drizzle' });
+	userId = db.insert(user).values({ name: 'Test' }).returning({ id: user.id }).get().id;
 	dir = await mkdtemp(join(tmpdir(), 'receipt-cleanup-'));
 });
 
@@ -24,7 +26,7 @@ beforeEach(async () => {
 async function addAgedImage(
 	daysOld: number
 ): Promise<{ id: number; receiptId: number; path: string }> {
-	const receiptId = createPendingReceipt(db);
+	const receiptId = createPendingReceipt(db, userId);
 	const path = join(dir, `${receiptId}.jpg`);
 	await writeFile(path, 'not-a-real-jpeg');
 	addReceiptImage(db, receiptId, path, 0);

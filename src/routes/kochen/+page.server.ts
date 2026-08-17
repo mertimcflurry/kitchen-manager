@@ -21,12 +21,12 @@ function parsePortions(value: string | null): RecipePortions {
 	return (RECIPE_PORTIONS as readonly number[]).includes(parsed) ? (parsed as RecipePortions) : 1;
 }
 
-export const load: PageServerLoad = ({ url }) => {
+export const load: PageServerLoad = ({ url, locals }) => {
 	return {
 		portions: parsePortions(url.searchParams.get('portionen')),
 		// Ohne Modell bekannt: was ohnehin bald weg muss — trägt die Wartezeit
 		// des Vorschlags mit Inhalt statt mit einem Spinner.
-		urgent: listStock(db).slice(0, WAITING_PREVIEW_COUNT)
+		urgent: listStock(db, locals.userId).slice(0, WAITING_PREVIEW_COUNT)
 	};
 };
 
@@ -35,7 +35,7 @@ export const actions: Actions = {
 	 * Ein Vorschlag aus dem aktuellen Bestand. `rejectedTitle` gesetzt heißt
 	 * „Anderer Vorschlag" — derselbe Aufruf, nur mit einer Zeile mehr im Prompt.
 	 */
-	vorschlag: async ({ request, url }) => {
+	vorschlag: async ({ request, url, locals }) => {
 		const data = await request.formData();
 		const portions = parsePortions(
 			(data.get('portions') as string | null) ?? url.searchParams.get('portionen')
@@ -50,11 +50,16 @@ export const actions: Actions = {
 			rawDiet === 'vegetarisch' || rawDiet === 'vegan' ? rawDiet : undefined;
 
 		try {
-			const { recipe } = await suggestRecipe(recipeStock(db), portions, rejectedTitle, {
-				mood,
-				direction,
-				diet
-			});
+			const { recipe } = await suggestRecipe(
+				recipeStock(db, locals.userId),
+				portions,
+				rejectedTitle,
+				{
+					mood,
+					direction,
+					diet
+				}
+			);
 			return { ok: true, recipe };
 		} catch (error) {
 			// `suggestRecipe` übersetzt schon über `toUserError`; hier trotzdem
@@ -71,7 +76,7 @@ export const actions: Actions = {
 	 * `ingredients` ist die vom Client mitgeschickte `source: "stock"`-Auswahl
 	 * des zuletzt angezeigten Rezepts, als JSON: `{stockItemId, amountBase}[]`.
 	 */
-	gekocht: async ({ request }) => {
+	gekocht: async ({ request, locals }) => {
 		const data = await request.formData();
 		const raw = data.get('ingredients');
 		if (typeof raw !== 'string') return fail(400, { message: 'Ungültig' });
@@ -92,12 +97,12 @@ export const actions: Actions = {
 				typeof (entry as Record<string, unknown>).amountBase === 'number'
 		);
 
-		const snapshots = cookIngredients(db, ingredients);
+		const snapshots = cookIngredients(db, locals.userId, ingredients);
 		return { ok: true, undo: snapshots };
 	},
 
 	/** Macht das Abbuchen rückgängig — Snapshot-Restore wie beim „Aufgebraucht"-Undo. */
-	undo: async ({ request }) => {
+	undo: async ({ request, locals }) => {
 		const data = await request.formData();
 		const raw = data.get('snapshots');
 		if (typeof raw !== 'string') return fail(400, { message: 'Ungültig' });
@@ -121,7 +126,7 @@ export const actions: Actions = {
 			);
 		});
 
-		undoCookIngredients(db, snapshots);
+		undoCookIngredients(db, locals.userId, snapshots);
 		return { ok: true };
 	}
 };

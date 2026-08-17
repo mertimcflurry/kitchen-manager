@@ -7,7 +7,7 @@
  * testbar bleibt.
  */
 
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { isCountable, remainingQuantity, type Location, type Unit } from '../../domain';
 import type { Db } from './client';
 import { product, stockItem } from './schema';
@@ -24,7 +24,7 @@ export type RecipeStockRow = {
 };
 
 /** Offener Bestand als Grundlage für den Rezeptvorschlag. */
-export function recipeStock(db: Db): RecipeStockRow[] {
+export function recipeStock(db: Db, userId: number): RecipeStockRow[] {
 	return db
 		.select({
 			id: stockItem.id,
@@ -37,7 +37,7 @@ export function recipeStock(db: Db): RecipeStockRow[] {
 		})
 		.from(stockItem)
 		.innerJoin(product, eq(stockItem.productId, product.id))
-		.where(isNull(stockItem.consumedAt))
+		.where(and(eq(stockItem.userId, userId), isNull(stockItem.consumedAt)))
 		.all();
 }
 
@@ -72,6 +72,7 @@ export type CookedSnapshot = { id: number; quantityBefore: number; fillLevelBefo
  */
 export function cookIngredients(
 	db: Db,
+	userId: number,
 	ingredients: Array<{ stockItemId: number; amountBase: number }>
 ): CookedSnapshot[] {
 	return db.transaction((tx) => {
@@ -84,8 +85,14 @@ export function cookIngredients(
 
 			// Innerhalb derselben Transaktion sieht jede Abfrage die Schreibungen
 			// vorheriger Durchläufe — bei doppelt referenzierter ID ist das schon
-			// der reduzierte Stand, absichtlich.
-			const item = tx.select().from(stockItem).where(eq(stockItem.id, stockItemId)).get();
+			// der reduzierte Stand, absichtlich. `userId` in der Bedingung, damit
+			// ein manipuliertes `stockItemId` aus einer fremden Nutzer-Session hier
+			// ins Leere läuft, statt einen fremden Posten abzubuchen.
+			const item = tx
+				.select()
+				.from(stockItem)
+				.where(and(eq(stockItem.id, stockItemId), eq(stockItem.userId, userId)))
+				.get();
 			if (!item || item.consumedAt) continue;
 
 			// Harte Sperre, nicht nur eine Prompt-Bitte: Packungen bleiben stehen.
@@ -163,7 +170,7 @@ export function cookIngredients(
 }
 
 /** Macht das Abbuchen rückgängig — dieselbe Snapshot-Restore-Schleife wie beim Aufbrauchen. */
-export function undoCookIngredients(db: Db, snapshots: CookedSnapshot[]): void {
+export function undoCookIngredients(db: Db, userId: number, snapshots: CookedSnapshot[]): void {
 	for (const snapshot of snapshots) {
 		db.update(stockItem)
 			.set({
@@ -171,7 +178,7 @@ export function undoCookIngredients(db: Db, snapshots: CookedSnapshot[]): void {
 				fillLevel: snapshot.fillLevelBefore,
 				consumedAt: null
 			})
-			.where(eq(stockItem.id, snapshot.id))
+			.where(and(eq(stockItem.id, snapshot.id), eq(stockItem.userId, userId)))
 			.run();
 	}
 }

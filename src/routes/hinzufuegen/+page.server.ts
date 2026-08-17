@@ -39,11 +39,11 @@ function describe(id: number): string {
 	return row ? formatQuantity(row.quantity, row.unit) : '';
 }
 
-export const load: PageServerLoad = () => {
+export const load: PageServerLoad = ({ locals }) => {
 	return {
 		// Die Chips: was am häufigsten gekauft wurde, steht vorn. Das meiste,
 		// was nachgetragen wird, ist Nachkauf von immer demselben.
-		frequent: frequentProducts(db, 12),
+		frequent: frequentProducts(db, locals.userId, 12),
 		// Der ganze Katalog wandert mit, damit die Suche ohne Roundtrip filtert.
 		// Bei einem Haushalt bleibt die Liste klein genug dafür.
 		all: searchProducts(db, '', 500)
@@ -52,13 +52,13 @@ export const load: PageServerLoad = () => {
 
 export const actions: Actions = {
 	/** Bekanntes Produkt in den Bestand legen. */
-	add: async ({ request }) => {
+	add: async ({ request, locals }) => {
 		const data = await request.formData();
 		const productId = Number(data.get('productId'));
 		if (!Number.isInteger(productId) || productId <= 0) return fail(400, { message: 'Ungültig' });
 
 		// Ohne Angabe entscheidet der letzte Kauf dieses Produkts.
-		const id = addStock(db, {
+		const id = addStock(db, locals.userId, {
 			productId,
 			location: parseLocation(data.get('location')),
 			...parseAmount(data)
@@ -67,14 +67,14 @@ export const actions: Actions = {
 	},
 
 	/** Neues Produkt anlegen und gleich einlagern. */
-	create: async ({ request }) => {
+	create: async ({ request, locals }) => {
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		if (name.length === 0) return fail(400, { message: 'Name fehlt' });
 		if (name.length > 80) return fail(400, { message: 'Name zu lang' });
 
 		const productId = findOrCreateProduct(db, name);
-		addStock(db, {
+		addStock(db, locals.userId, {
 			productId,
 			location: parseLocation(data.get('location')),
 			...parseAmount(data)
