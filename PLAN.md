@@ -544,9 +544,19 @@ oder einen neuen anlegen.
       „Einstellungen", verlinkt auf `/nutzer?next=/einstellungen`.
 - [x] Rezeptvorschlag (M8) — `recipeStock(db, locals.userId)` in
       `src/routes/kochen/+page.server.ts` bestätigt nutzerscoped.
-- [ ] **Am Handy gegenprüfen**: Auswahl-Screen bei erstem Aufruf ohne Cookie,
+- [x] **Am Handy gegenprüfen**: Auswahl-Screen bei erstem Aufruf ohne Cookie,
       Wechseln zwischen zwei angelegten Nutzern, dass keine Bestände sich
-      vermischen
+      vermischen. Dabei aufgefallen und behoben: `cookies.set` setzt
+      `secure: true`, sobald der Host nicht `localhost` ist — über den
+      Tailscale-Hostnamen (HTTP, kein TLS) verwarf der Browser das Cookie
+      still, `/nutzer` lief in einer Schleife. Fix und Fallstrick in
+      `CLAUDE.md` festgehalten.
+- [x] Avatar-Kreis oben rechts in `PageHeader` — gespiegelt vom Bon-Kreis
+      unten, auf jeder Seite sichtbar, damit „wer bin ich gerade" nicht erst
+      in den Einstellungen nachgesehen werden muss. Zeile in Einstellungen
+      bleibt als zweiter Weg.
+- Platzhalter-Nutzer „Ich" aus dem M11-Backfill in der Dev-DB aufgelöst: Bestand
+  (94 Posten, 9 Bons) auf einen echten Nutzer umgezogen, Testnutzer gelöscht.
 
 ---
 
