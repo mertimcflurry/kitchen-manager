@@ -517,7 +517,7 @@ die kennt die Seite ohne Modell.
       Wieder aufmachen, falls sich zeigt, dass ein Tailscale-Aussetzer im
       Alltag wirklich stört.
 
-### M11 — Mehrere Nutzer
+### M11 — Mehrere Nutzer ✅
 
 Entschieden 2026-08-17, siehe die Begründung unter „Kein Auth, trotzdem
 mehrere Nutzer" in `CLAUDE.md`. Kein Login: ein Cookie pro Gerät merkt sich
