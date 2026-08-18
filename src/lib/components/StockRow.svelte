@@ -93,15 +93,16 @@
 			(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 		}
 
-		// Nur nach rechts. Nach links passiert nichts, damit nicht versehentlich
-		// zwei Bedeutungen an einer Geste hängen.
-		dx = Math.max(0, deltaX);
+		// Beide Richtungen bedeuten dasselbe: aufgebraucht. Zwei Gesten für eine
+		// Bedeutung, keine für zwei — das Risiko einer Fehldeutung entsteht nur,
+		// wenn dieselbe Richtung mehrfach belegt wäre.
+		dx = deltaX;
 	}
 
 	function onPointerUp() {
 		if (!dragging) return;
 		dragging = false;
-		if (dx >= SWIPE_THRESHOLD) {
+		if (Math.abs(dx) >= SWIPE_THRESHOLD) {
 			onConsume(item);
 		}
 		dx = 0;
@@ -117,12 +118,15 @@
 	onpointerup={onPointerUp}
 	onpointercancel={onPointerUp}
 >
-	<!-- Was unter der Zeile zum Vorschein kommt, während gewischt wird. -->
+	<!-- Was unter der Zeile zum Vorschein kommt, während gewischt wird. Erscheint
+	     auf der Seite, von der die Zeile wegzieht — rechts bei Wisch nach links,
+	     links bei Wisch nach rechts. -->
 	<div
-		class="absolute inset-0 flex items-center bg-emerald-600 pl-5 text-sm font-medium text-white"
+		class="absolute inset-0 flex items-center bg-emerald-600 text-sm font-medium text-white
+			{dx < 0 ? 'justify-end pr-5' : 'justify-start pl-5'}"
 		aria-hidden="true"
 	>
-		{dx >= SWIPE_THRESHOLD ? 'Loslassen: aufgebraucht' : 'Aufgebraucht'}
+		{Math.abs(dx) >= SWIPE_THRESHOLD ? 'Loslassen: aufgebraucht' : 'Aufgebraucht'}
 	</div>
 
 	<div
